@@ -1,5 +1,5 @@
 # BuzzBridge - Integration Setup
-# Rev: 1.5
+# Rev: 1.6
 #
 # Entry point for the BuzzBridge custom integration. Handles:
 #   - Creating the BeestatApi client with HA's shared aiohttp session
@@ -37,19 +37,25 @@ from .entity import BuzzBridgeConfigEntry, BuzzBridgeData, get_device_prefix
 _LOGGER = logging.getLogger(__name__)
 
 
-def _migrate_device_names(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> None:
-    """Ensure all device names include the configured prefix.
+def _migrate_naming(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> None:
+    """Migrate device names and entity IDs to the standardized convention.
 
-    HA's device registry caches device names and does not update them from
-    DeviceInfo on subsequent loads. This explicitly updates any BuzzBridge
-    device whose name doesn't match the expected name with prefix.
+    Device naming: {prefix} {type} {room}
+      - Thermostats:      {prefix} Thermostat {name}
+      - Base sensors:     {prefix} Base {name}
+      - Remote sensors:   {prefix} Remote {name}
 
-    Uses coordinator data to reconstruct the correct full device name
-    (including parent thermostat name for remote sensors).
+    Entity IDs follow from device name + entity name:
+      sensor.{prefix_slug}_thermostat_{room_slug}_{measurement}
+
+    Handles upgrades from any previous naming scheme by:
+      1. Computing the expected device name from coordinator data
+      2. Renaming entity IDs (old device slug → new device slug)
+      3. Updating the device name in the registry
+
+    Also runs on prefix changes (reconfigure) to update all names.
     """
     prefix = get_device_prefix(entry)
-    if not prefix:
-        return
 
     fast_coord = entry.runtime_data.fast_coordinator
     if fast_coord.data is None:
@@ -58,116 +64,107 @@ def _migrate_device_names(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> 
     thermostats = fast_coord.data.get(DATA_THERMOSTATS, {})
     sensors = fast_coord.data.get(DATA_SENSORS, {})
 
-    # Build a map of device identifier -> expected name
+    # Build expected device names keyed by device identifier
     expected_names: dict[str, str] = {}
 
-    # Thermostat devices: identifier = tstat_id
     for tstat_id, tstat in thermostats.items():
         tstat_name = tstat.get("name", f"Thermostat {tstat_id}")
         expected_names[str(tstat_id)] = (
-            f"{prefix} {tstat_name}" if prefix else tstat_name
+            f"{prefix} Thermostat {tstat_name}" if prefix
+            else f"Thermostat {tstat_name}"
         )
 
-    # Remote sensor devices: identifier = "sensor_{sensor_id}"
     for sensor_id, sensor_data in sensors.items():
         if sensor_data.get("deleted") or sensor_data.get("inactive"):
             continue
         sensor_name = sensor_data.get("name", f"Sensor {sensor_id}")
-        parent_tstat_id = str(sensor_data.get("thermostat_id", ""))
-        parent_tstat = thermostats.get(parent_tstat_id, {})
-        parent_name = parent_tstat.get("name", "Unknown")
-
-        if sensor_name.lower() == parent_name.lower():
-            base_name = f"{sensor_name} Sensor"
-        else:
-            base_name = sensor_name
-
+        sensor_type = sensor_data.get("type", "")
+        type_prefix = "Base" if sensor_type == "thermostat" else "Remote"
         expected_names[f"sensor_{sensor_id}"] = (
-            f"{prefix} {base_name}" if prefix else base_name
+            f"{prefix} {type_prefix} {sensor_name}" if prefix
+            else f"{type_prefix} {sensor_name}"
         )
 
-    # Now update any devices with wrong names
     dev_reg = dr.async_get(hass)
+    ent_reg = er.async_get(hass)
     devices = dr.async_entries_for_config_entry(dev_reg, entry.entry_id)
+    all_entities = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
 
-    migrated = 0
+    # Group entities by device_id for efficient lookup
+    entities_by_device: dict[str, list] = {}
+    for ent in all_entities:
+        if ent.device_id:
+            entities_by_device.setdefault(ent.device_id, []).append(ent)
+
+    migrated_devices = 0
+    migrated_entities = 0
+
     for device in devices:
-        # Find the expected name from our map
+        # Find expected name from device identifiers
         expected = None
         for ident_domain, ident_id in device.identifiers:
             if ident_domain == DOMAIN and ident_id in expected_names:
                 expected = expected_names[ident_id]
                 break
-
         if expected is None:
             continue
 
-        # Clear name_by_user if it was set to an old name without the prefix.
-        # This happens when HA cached device names from before the prefix
-        # was added. name_by_user overrides the integration-provided name,
-        # so we need to clear it for the correct name to show.
-        if device.name_by_user and not device.name_by_user.startswith(f"{prefix} "):
+        current_name = device.name
+        if current_name == expected and not device.name_by_user:
+            continue  # Already correct, no user override
+
+        # Clear stale name_by_user so integration-provided name takes effect
+        if device.name_by_user:
             _LOGGER.info(
-                "Clearing stale name_by_user %r for device %r",
+                "Clearing name_by_user %r for device %r",
                 device.name_by_user, device.name,
             )
             dev_reg.async_update_device(device.id, name_by_user=None)
-            migrated += 1
-        elif device.name != expected and not device.name_by_user:
-            _LOGGER.info(
-                "Fixing device name: %r -> %r", device.name, expected
-            )
+
+        # Rename entity IDs before changing device name
+        old_slug = slugify(current_name)
+        new_slug = slugify(expected)
+
+        if old_slug != new_slug:
+            for ent in entities_by_device.get(device.id, []):
+                old_eid = ent.entity_id
+                domain_part, slug_part = old_eid.split(".", 1)
+
+                if slug_part.startswith(f"{old_slug}_"):
+                    # Entity ID matches current device name — simple slug swap
+                    suffix = slug_part[len(old_slug):]
+                    new_eid = f"{domain_part}.{new_slug}{suffix}"
+                elif ent.original_name:
+                    # Entity ID is from a previous naming era — rebuild from
+                    # the new device slug + the entity's own name
+                    entity_suffix = slugify(ent.original_name)
+                    new_eid = f"{domain_part}.{new_slug}_{entity_suffix}"
+                else:
+                    continue  # Cannot determine suffix, skip
+
+                if new_eid == old_eid:
+                    continue
+                if not valid_entity_id(new_eid) or ent_reg.async_get(new_eid):
+                    _LOGGER.warning(
+                        "Skipping entity migration: %s -> %s (invalid or exists)",
+                        old_eid, new_eid,
+                    )
+                    continue
+                _LOGGER.info("Migrating entity ID: %s -> %s", old_eid, new_eid)
+                ent_reg.async_update_entity(old_eid, new_entity_id=new_eid)
+                migrated_entities += 1
+
+        # Update device name if it differs
+        if current_name != expected:
+            _LOGGER.info("Updating device name: %r -> %r", current_name, expected)
             dev_reg.async_update_device(device.id, name=expected)
-            migrated += 1
+            migrated_devices += 1
 
-    if migrated:
+    if migrated_devices or migrated_entities:
         _LOGGER.info(
-            "BuzzBridge device migration: %d of %d devices fixed",
-            migrated, len(devices),
+            "BuzzBridge naming migration: %d devices, %d entities updated",
+            migrated_devices, migrated_entities,
         )
-
-
-def _migrate_entity_ids(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> None:
-    """Migrate entity IDs to include the device prefix if missing.
-
-    When the configurable prefix was added in v1.5, existing entities kept
-    their old IDs (e.g. sensor.home_temperature). This renames them to
-    include the prefix (e.g. sensor.buzzbridge_home_temperature) so entity
-    IDs are consistent with the device names.
-    """
-    prefix_slug = slugify(get_device_prefix(entry))
-    if not prefix_slug:
-        return  # No prefix configured, nothing to migrate
-
-    ent_reg = er.async_get(hass)
-    entries = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
-
-    migrated = 0
-    for entity_entry in entries:
-        old_slug = entity_entry.entity_id.split(".", 1)[1]
-
-        if old_slug.startswith(f"{prefix_slug}_"):
-            continue  # Already has the prefix
-
-        new_entity_id = f"{entity_entry.domain}.{prefix_slug}_{old_slug}"
-
-        if not valid_entity_id(new_entity_id) or ent_reg.async_get(new_entity_id):
-            _LOGGER.warning(
-                "Skipping entity migration: %s -> %s (invalid or exists)",
-                entity_entry.entity_id, new_entity_id,
-            )
-            continue
-
-        _LOGGER.info(
-            "Migrating entity ID: %s -> %s", entity_entry.entity_id, new_entity_id
-        )
-        ent_reg.async_update_entity(
-            entity_entry.entity_id, new_entity_id=new_entity_id
-        )
-        migrated += 1
-
-    if migrated:
-        _LOGGER.info("BuzzBridge entity migration: %d entities renamed", migrated)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> bool:
@@ -193,11 +190,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -
     # Set up all platforms (creates entities in the registry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Migrate device names and entity IDs to include the prefix AFTER
-    # entities are created. This handles both upgrades from pre-v1.5 and
-    # fresh installs where HA may not include the prefix automatically.
-    _migrate_device_names(hass, entry)
-    _migrate_entity_ids(hass, entry)
+    # Migrate device names and entity IDs to standardized convention AFTER
+    # entities are created. Handles upgrades from any previous naming scheme
+    # and prefix changes from reconfigure.
+    _migrate_naming(hass, entry)
 
     # Listen for options changes (poll intervals)
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))

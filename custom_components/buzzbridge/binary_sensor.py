@@ -1,5 +1,5 @@
 # BuzzBridge - Binary Sensor Platform
-# Rev: 1.6
+# Rev: 1.7
 #
 # Binary sensors for:
 #   - Remote sensor occupancy (motion detection via ecobee sensors)
@@ -13,9 +13,8 @@ from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
-from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -26,6 +25,7 @@ from .const import (
     DOMAIN,
     ECOBEE_MODELS,
     MANUFACTURER,
+    SENSOR_TYPE_MODELS,
 )
 from .coordinator import FastPollCoordinator
 from .entity import BuzzBridgeConfigEntry, get_device_prefix
@@ -63,7 +63,7 @@ async def async_setup_entry(
 
         device_info = DeviceInfo(
             identifiers={(DOMAIN, str(tstat_id))},
-            name=f"{prefix} {tstat_name}" if prefix else tstat_name,
+            name=f"{prefix} Thermostat {tstat_name}" if prefix else f"Thermostat {tstat_name}",
             manufacturer=MANUFACTURER,
             model=model_name,
         )
@@ -93,19 +93,19 @@ async def async_setup_entry(
         parent_tstat = thermostats.get(parent_tstat_id, {})
         parent_name = parent_tstat.get("name", "Unknown")
 
-        # Use sensor name only (parent shown via via_device relationship)
-        # Append "Sensor" if sensor name matches parent thermostat name
-        if sensor_name.lower() == parent_name.lower():
-            base_name = f"{sensor_name} Sensor"
-        else:
-            base_name = sensor_name
-        remote_device_name = f"{prefix} {base_name}" if prefix else base_name
+        # Device type prefix: Base for thermostat-extracted, Remote for remotes
+        sensor_type = sensor_data.get("type", "")
+        type_prefix = "Base" if sensor_type == "thermostat" else "Remote"
+        remote_device_name = (
+            f"{prefix} {type_prefix} {sensor_name}" if prefix
+            else f"{type_prefix} {sensor_name}"
+        )
 
         device_info = DeviceInfo(
             identifiers={(DOMAIN, f"sensor_{sensor_id}")},
             name=remote_device_name,
             manufacturer=MANUFACTURER,
-            model=sensor_data.get("type", "").replace("_", " ").title(),
+            model=SENSOR_TYPE_MODELS.get(sensor_data.get("type", ""), sensor_data.get("type", "").replace("_", " ").title()),
             via_device=(DOMAIN, parent_tstat_id),
         )
 

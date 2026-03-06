@@ -191,6 +191,10 @@ SECONDS_PER_HOUR: Final = 3600
 # =============================================================================
 # ecobee model names
 # =============================================================================
+SENSOR_TYPE_MODELS: Final = {
+    "thermostat": "Ecobee3 Base Sensor - Extracted",
+}
+
 ECOBEE_MODELS: Final = {
     "apolloSmart": "ecobee SmartThermostat",
     "aresSmart": "ecobee Smart Thermostat Premium",

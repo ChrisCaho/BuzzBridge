@@ -1,5 +1,5 @@
 # BuzzBridge - Sensor Platform
-# Rev: 1.6
+# Rev: 1.7
 #
 # Creates sensor entities for each thermostat and remote sensor discovered
 # via the Beestat API. Entity types include:
@@ -26,6 +26,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -66,6 +67,7 @@ from .const import (
     ECOBEE_MODELS,
     MANUFACTURER,
     SECONDS_PER_HOUR,
+    SENSOR_TYPE_MODELS,
 )
 from .coordinator import FastPollCoordinator, SlowPollCoordinator
 from .entity import BuzzBridgeConfigEntry, get_device_prefix
@@ -105,7 +107,7 @@ async def async_setup_entry(
 
         device_info = DeviceInfo(
             identifiers={(DOMAIN, str(tstat_id))},
-            name=f"{prefix} {tstat_name}" if prefix else tstat_name,
+            name=f"{prefix} Thermostat {tstat_name}" if prefix else f"Thermostat {tstat_name}",
             manufacturer=MANUFACTURER,
             model=model_name,
             sw_version=(ecobee_data.get("settings") or {}).get("firmwareVersion"),
@@ -280,19 +282,18 @@ async def async_setup_entry(
         parent_name = parent_tstat.get("name", "Unknown")
         sensor_type = sensor_data.get("type", "")
 
-        # Use sensor name only (parent shown via via_device relationship)
-        # Append "Sensor" if sensor name matches parent thermostat name
-        if sensor_name.lower() == parent_name.lower():
-            base_name = f"{sensor_name} Sensor"
-        else:
-            base_name = sensor_name
-        remote_device_name = f"{prefix} {base_name}" if prefix else base_name
+        # Device type prefix: Base for thermostat-extracted, Remote for remotes
+        type_prefix = "Base" if sensor_type == "thermostat" else "Remote"
+        remote_device_name = (
+            f"{prefix} {type_prefix} {sensor_name}" if prefix
+            else f"{type_prefix} {sensor_name}"
+        )
 
         device_info = DeviceInfo(
             identifiers={(DOMAIN, f"sensor_{sensor_id}")},
             name=remote_device_name,
             manufacturer=MANUFACTURER,
-            model=sensor_type.replace("_", " ").title(),
+            model=SENSOR_TYPE_MODELS.get(sensor_type, sensor_type.replace("_", " ").title()),
             via_device=(DOMAIN, parent_tstat_id),
         )
 
@@ -648,20 +649,17 @@ class BuzzBridgeFilterSensor(CoordinatorEntity, SensorEntity):
         filters = tstat.get("filters", {})
         attrs: dict[str, Any] = {"source": "beestat"}
         for filter_type, fdata in filters.items():
-            attrs["filter_type"] = filter_type
-            attrs["life"] = fdata.get("life")
-            attrs["life_units"] = fdata.get("life_units")
-            attrs["last_changed"] = fdata.get("last_changed")
-
-            # Estimate days remaining
             life = fdata.get("life")
             life_units = fdata.get("life_units")
-            runtime_seconds = fdata.get("runtime", 0)
             last_changed = fdata.get("last_changed")
+            attrs["filter_type"] = filter_type
+            attrs["life"] = life
+            attrs["life_units"] = life_units
+            attrs["last_changed"] = last_changed
 
+            # Estimate days remaining
             if life and life_units and last_changed:
                 try:
-                    from datetime import datetime
                     changed_date = datetime.strptime(last_changed, "%Y-%m-%d")
                     now = dt_util.now().replace(tzinfo=None)
                     days_used = (now - changed_date).days
