@@ -1,11 +1,12 @@
 # BuzzBridge - Integration Setup
-# Rev: 1.3
+# Rev: 1.4
 #
 # Entry point for the BuzzBridge custom integration. Handles:
 #   - Creating the BeestatApi client with HA's shared aiohttp session
 #   - Setting up Fast and Slow poll coordinators
 #   - Forwarding platform setup (sensor, binary_sensor, button)
 #   - Options update listener for poll interval changes
+#   - Entity ID migration (adds prefix to legacy entity IDs)
 #   - Clean unload
 #   - Device cleanup (prevents removing active devices)
 
@@ -13,9 +14,10 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
+from homeassistant.core import HomeAssistant, valid_entity_id
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.util import slugify
 
 from .api import BeestatApi
 from .const import (
@@ -30,13 +32,61 @@ from .const import (
     PLATFORMS,
 )
 from .coordinator import FastPollCoordinator, SlowPollCoordinator
-from .entity import BuzzBridgeConfigEntry, BuzzBridgeData
+from .entity import BuzzBridgeConfigEntry, BuzzBridgeData, get_device_prefix
 
 _LOGGER = logging.getLogger(__name__)
 
 
+def _migrate_entity_ids(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> None:
+    """Migrate entity IDs to include the device prefix if missing.
+
+    When the configurable prefix was added in v1.5, existing entities kept
+    their old IDs (e.g. sensor.home_temperature). This renames them to
+    include the prefix (e.g. sensor.buzzbridge_home_temperature) so entity
+    IDs are consistent with the device names.
+    """
+    prefix_slug = slugify(get_device_prefix(entry))
+    if not prefix_slug:
+        return  # No prefix configured, nothing to migrate
+
+    ent_reg = er.async_get(hass)
+    entries = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
+
+    for entity_entry in entries:
+        old_slug = entity_entry.entity_id.split(".", 1)[1]
+
+        if old_slug.startswith(f"{prefix_slug}_"):
+            continue  # Already has the prefix
+
+        new_entity_id = f"{entity_entry.domain}.{prefix_slug}_{old_slug}"
+
+        if not valid_entity_id(new_entity_id):
+            _LOGGER.warning(
+                "Skipping migration of %s: %s is not a valid entity ID",
+                entity_entry.entity_id, new_entity_id,
+            )
+            continue
+
+        if ent_reg.async_get(new_entity_id):
+            _LOGGER.warning(
+                "Skipping migration of %s: %s already exists",
+                entity_entry.entity_id, new_entity_id,
+            )
+            continue
+
+        _LOGGER.info(
+            "Migrating entity ID: %s -> %s", entity_entry.entity_id, new_entity_id
+        )
+        ent_reg.async_update_entity(
+            entity_entry.entity_id, new_entity_id=new_entity_id
+        )
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> bool:
     """Set up BuzzBridge from a config entry."""
+    # Migrate legacy entity IDs to include the prefix before platform setup
+    _migrate_entity_ids(hass, entry)
+
     session = async_get_clientsession(hass)
     api = BeestatApi(session, entry.data[CONF_API_KEY])
 
