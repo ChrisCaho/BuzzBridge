@@ -107,12 +107,12 @@
       "heating_degree_days": { "name": "Heating Degree Days" },
       "comfort_index": { "name": "Comfort Index" },
       "temp_differential": { "name": "Indoor/Outdoor Differential" },
-      "remote_temperature": { "name": "Temperature" },
-      "remote_humidity": { "name": "Humidity" }
+      "remote_temperature": { "name": "Temperature" }
     },
     "binary_sensor": {
       "online": { "name": "Online" },
-      "occupancy": { "name": "Occupancy" }
+      "occupancy": { "name": "Occupancy" },
+      "participating": { "name": "Participating" }
     },
     "button": {
       "boost_polling": { "name": "Boost Polling" }

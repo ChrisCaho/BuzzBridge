@@ -1,5 +1,5 @@
 # BuzzBridge - Sensor Platform
-# Rev: 1.5
+# Rev: 1.6
 #
 # Creates sensor entities for each thermostat and remote sensor discovered
 # via the Beestat API. Entity types include:
@@ -308,20 +308,6 @@ async def async_setup_entry(
             )
         )
 
-        # Humidity (only on thermostat built-in sensors, not all remotes)
-        if sensor_data.get("humidity") is not None:
-            entities.append(
-                BuzzBridgeRemoteSensorEntity(
-                    fast_coord, sensor_id, device_info,
-                    parent_name, sensor_name,
-                    value_key="humidity",
-                    translation_key="remote_humidity",
-                    device_class=SensorDeviceClass.HUMIDITY,
-                    unit=PERCENTAGE,
-                    state_class=SensorStateClass.MEASUREMENT,
-                )
-            )
-
     async_add_entities(entities)
 
 
@@ -359,6 +345,7 @@ class BuzzBridgeThermostatSensor(CoordinatorEntity, SensorEntity):
         self._attr_native_unit_of_measurement = unit
         self._attr_state_class = state_class
         self._attr_entity_category = entity_category
+        self._attr_extra_state_attributes = {"source": "beestat"}
 
     @property
     def native_value(self) -> Any:
@@ -394,6 +381,7 @@ class BuzzBridgeEcobeeSensor(CoordinatorEntity, SensorEntity):
         self._attr_translation_key = translation_key
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_{'_'.join(str(k) for k in key_path)}"
         self._attr_device_info = device_info
+        self._attr_extra_state_attributes = {"source": "beestat"}
         self._attr_device_class = device_class
         self._attr_native_unit_of_measurement = unit
 
@@ -439,6 +427,7 @@ class BuzzBridgeRunningEquipmentSensor(CoordinatorEntity, SensorEntity):
         self._ecobee_id = ecobee_id
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_running_equipment"
         self._attr_device_info = device_info
+        self._attr_extra_state_attributes = {"source": "beestat"}
 
     @property
     def native_value(self) -> str:
@@ -498,7 +487,7 @@ class BuzzBridgeHoldSensor(CoordinatorEntity, SensorEntity):
         """Return hold details as attributes."""
         hold = self._get_active_hold()
         if hold is None:
-            return {"active": False}
+            return {"active": False, "source": "beestat"}
 
         attrs: dict[str, Any] = {
             "active": True,
@@ -519,6 +508,7 @@ class BuzzBridgeHoldSensor(CoordinatorEntity, SensorEntity):
         if heat_hold is not None:
             attrs["heat_hold_temp"] = BeestatApi.ecobee_temp_to_float(heat_hold)
 
+        attrs["source"] = "beestat"
         return attrs
 
 
@@ -589,27 +579,29 @@ class BuzzBridgeAirQualitySensor(CoordinatorEntity, SensorEntity):
         value = runtime.get(self._aq_key)
 
         if not BeestatApi.is_value_available(value):
-            return {}
+            return {"source": "beestat"}
+
+        attrs: dict[str, Any] = {"source": "beestat"}
 
         if self._aq_type == "score":
             level = get_aq_score_level(value)
-            return level if level else {}
-
-        if self._aq_type == "co2":
+            if level:
+                attrs.update(level)
+        elif self._aq_type == "co2":
             level = get_co2_level(value)
-            return level if level else {}
-
-        if self._aq_type == "voc":
+            if level:
+                attrs.update(level)
+        elif self._aq_type == "voc":
             level = get_voc_level(value)
-            return level if level else {}
-
-        if self._aq_type == "accuracy":
+            if level:
+                attrs.update(level)
+        elif self._aq_type == "accuracy":
             label = get_aq_accuracy_label(value)
             if label:
-                return {"level": label[0], "description": label[1]}
-            return {}
+                attrs["level"] = label[0]
+                attrs["description"] = label[1]
 
-        return {}
+        return attrs
 
 
 class BuzzBridgeFilterSensor(CoordinatorEntity, SensorEntity):
@@ -653,7 +645,7 @@ class BuzzBridgeFilterSensor(CoordinatorEntity, SensorEntity):
             return {}
         tstat = self.coordinator.data.get(DATA_THERMOSTATS, {}).get(self._tstat_id, {})
         filters = tstat.get("filters", {})
-        attrs: dict[str, Any] = {}
+        attrs: dict[str, Any] = {"source": "beestat"}
         for filter_type, fdata in filters.items():
             attrs["filter_type"] = filter_type
             attrs["life"] = fdata.get("life")
@@ -741,9 +733,10 @@ class BuzzBridgeRuntimeSensor(CoordinatorEntity, SensorEntity):
         """Return the date this summary covers."""
         summary = self._get_latest_summary()
         date = summary.get("date")
+        attrs: dict[str, Any] = {"source": "beestat"}
         if date:
-            return {"date": date}
-        return {}
+            attrs["date"] = date
+        return attrs
 
 
 class BuzzBridgeDegreeDaySensor(CoordinatorEntity, SensorEntity):
@@ -774,6 +767,7 @@ class BuzzBridgeDegreeDaySensor(CoordinatorEntity, SensorEntity):
         self._attr_device_info = device_info
         self._attr_native_unit_of_measurement = DEGREE_DAY_UNIT
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
+        self._attr_extra_state_attributes = {"source": "beestat"}
 
     def _get_latest_summary(self) -> dict[str, Any]:
         """Get the most recent runtime summary for this thermostat."""
@@ -818,6 +812,7 @@ class BuzzBridgeComfortSensor(CoordinatorEntity, SensorEntity):
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_comfort_index"
         self._attr_device_info = device_info
         self._attr_native_unit_of_measurement = PERCENTAGE
+        self._attr_extra_state_attributes = {"source": "calculated"}
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
     @property
@@ -854,6 +849,7 @@ class BuzzBridgeDifferentialSensor(CoordinatorEntity, SensorEntity):
         self._attr_device_info = device_info
         self._attr_device_class = SensorDeviceClass.TEMPERATURE
         self._attr_native_unit_of_measurement = UnitOfTemperature.FAHRENHEIT
+        self._attr_extra_state_attributes = {"source": "calculated"}
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
     @property
@@ -869,7 +865,8 @@ class BuzzBridgeDifferentialSensor(CoordinatorEntity, SensorEntity):
         weather = ecobee.get("weather") or {}
         forecasts = weather.get("forecasts") or []
         first = forecasts[0] if forecasts else None
-        outdoor = first.get("temperature") if isinstance(first, dict) else None
+        outdoor_raw = first.get("temperature") if isinstance(first, dict) else None
+        outdoor = BeestatApi.ecobee_temp_to_float(outdoor_raw)
 
         return indoor_outdoor_differential(indoor, outdoor)
 
@@ -902,6 +899,7 @@ class BuzzBridgeRemoteSensorEntity(CoordinatorEntity, SensorEntity):
         self._attr_device_class = device_class
         self._attr_native_unit_of_measurement = unit
         self._attr_state_class = state_class
+        self._attr_extra_state_attributes = {"source": "beestat"}
 
     @property
     def native_value(self) -> Any:

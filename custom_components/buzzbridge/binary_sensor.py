@@ -1,5 +1,5 @@
 # BuzzBridge - Binary Sensor Platform
-# Rev: 1.5
+# Rev: 1.6
 #
 # Binary sensors for:
 #   - Remote sensor occupancy (motion detection via ecobee sensors)
@@ -114,6 +114,13 @@ async def async_setup_entry(
             )
         )
 
+        # Participating in comfort average
+        entities.append(
+            BuzzBridgeParticipatingSensor(
+                fast_coord, sensor_id, device_info, parent_name, sensor_name,
+            )
+        )
+
     async_add_entities(entities)
 
 
@@ -138,6 +145,7 @@ class BuzzBridgeOnlineSensor(CoordinatorEntity, BinarySensorEntity):
         self._attr_translation_key = "online"
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_online"
         self._attr_device_info = device_info
+        self._attr_extra_state_attributes = {"source": "beestat"}
 
     @property
     def is_on(self) -> bool | None:
@@ -173,6 +181,7 @@ class BuzzBridgeOccupancySensor(CoordinatorEntity, BinarySensorEntity):
         self._attr_translation_key = "occupancy"
         self._attr_unique_id = f"{DOMAIN}_sensor_{sensor_id}_occupancy"
         self._attr_device_info = device_info
+        self._attr_extra_state_attributes = {"source": "beestat"}
 
     @property
     def is_on(self) -> bool | None:
@@ -185,4 +194,37 @@ class BuzzBridgeOccupancySensor(CoordinatorEntity, BinarySensorEntity):
             return occ
         if isinstance(occ, str):
             return occ.lower() == "true"
+        return None
+
+
+class BuzzBridgeParticipatingSensor(CoordinatorEntity, BinarySensorEntity):
+    """Whether a remote sensor participates in the thermostat's comfort average."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "participating"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(
+        self,
+        coordinator: FastPollCoordinator,
+        sensor_id: str,
+        device_info: DeviceInfo,
+        parent_name: str,
+        sensor_name: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self._sensor_id = str(sensor_id)
+        self._attr_unique_id = f"{DOMAIN}_sensor_{sensor_id}_participating"
+        self._attr_device_info = device_info
+        self._attr_extra_state_attributes = {"source": "beestat"}
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True if sensor is included in comfort average."""
+        if self.coordinator.data is None:
+            return None
+        sensor = self.coordinator.data.get(DATA_SENSORS, {}).get(self._sensor_id, {})
+        in_use = sensor.get("in_use")
+        if isinstance(in_use, bool):
+            return in_use
         return None
