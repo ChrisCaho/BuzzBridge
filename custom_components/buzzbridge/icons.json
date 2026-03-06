@@ -1,0 +1,37 @@
+{
+  "entity": {
+    "sensor": {
+      "temperature": { "default": "mdi:thermometer" },
+      "humidity": { "default": "mdi:water-percent" },
+      "setpoint_heat": { "default": "mdi:thermometer-chevron-up" },
+      "setpoint_cool": { "default": "mdi:thermometer-chevron-down" },
+      "hvac_mode": { "default": "mdi:hvac" },
+      "running_equipment": { "default": "mdi:hvac" },
+      "fan_mode": { "default": "mdi:fan" },
+      "hold_status": { "default": "mdi:hand-back-left" },
+      "aq_score": { "default": "mdi:air-filter" },
+      "co2": { "default": "mdi:molecule-co2" },
+      "voc": { "default": "mdi:chemical-weapon" },
+      "aq_accuracy": { "default": "mdi:tune-vertical" },
+      "filter_runtime": { "default": "mdi:air-filter" },
+      "outdoor_temperature": { "default": "mdi:home-thermometer-outline" },
+      "outdoor_humidity": { "default": "mdi:water-percent" },
+      "cooling_runtime": { "default": "mdi:snowflake" },
+      "heating_runtime": { "default": "mdi:fire" },
+      "fan_runtime": { "default": "mdi:fan" },
+      "cooling_degree_days": { "default": "mdi:weather-sunny" },
+      "heating_degree_days": { "default": "mdi:weather-snowy" },
+      "comfort_index": { "default": "mdi:emoticon-happy-outline" },
+      "temp_differential": { "default": "mdi:thermometer-lines" },
+      "remote_temperature": { "default": "mdi:thermometer" },
+      "remote_humidity": { "default": "mdi:water-percent" }
+    },
+    "binary_sensor": {
+      "online": { "default": "mdi:lan-connect" },
+      "occupancy": { "default": "mdi:motion-sensor" }
+    },
+    "button": {
+      "boost_polling": { "default": "mdi:rocket-launch" }
+    }
+  }
+}

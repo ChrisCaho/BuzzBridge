@@ -1,5 +1,5 @@
 # BuzzBridge - Data Coordinators
-# Rev: 1.1
+# Rev: 1.2
 #
 # Two DataUpdateCoordinators manage polling:
 #
@@ -28,8 +28,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.components.persistent_notification import async_create as pn_create
 from homeassistant.util import dt as dt_util
+
+from homeassistant.helpers import issue_registry as ir
 
 from .api import BeestatApi, BeestatApiError, BeestatAuthError, BeestatRateLimitError
 from .const import (
@@ -68,6 +69,7 @@ class FastPollCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Use None to distinguish "never polled" from "polled but found 0 thermostats"
         self._known_thermostat_ids: set[str] | None = None
         self._boost_until = None  # UTC datetime or None
+        self._previously_unavailable = False
 
         super().__init__(
             hass,
@@ -121,14 +123,25 @@ class FastPollCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             data = await self._api.fetch_fast_poll_data()
         except BeestatAuthError as err:
+            self._previously_unavailable = True
             raise ConfigEntryAuthFailed(
                 f"Authentication failed: {err}"
             ) from err
         except BeestatRateLimitError as err:
-            _LOGGER.warning("Beestat rate limit hit — will retry at next interval")
+            if not self._previously_unavailable:
+                _LOGGER.warning("Beestat API unavailable (rate limited)")
+                self._previously_unavailable = True
             raise UpdateFailed(f"Rate limited: {err}") from err
         except BeestatApiError as err:
+            if not self._previously_unavailable:
+                _LOGGER.warning("Beestat API unavailable: %s", err)
+                self._previously_unavailable = True
             raise UpdateFailed(f"API error: {err}") from err
+
+        # Log recovery from unavailable state
+        if self._previously_unavailable:
+            _LOGGER.info("Beestat API connection restored (fast poll)")
+            self._previously_unavailable = False
 
         # Device discovery — detect new/removed thermostats
         current_ids = set(str(tid) for tid in data.get(DATA_THERMOSTATS, {}))
@@ -142,26 +155,26 @@ class FastPollCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 names = [
                     thermostat_data.get(tid, {}).get("name", tid) for tid in new_ids
                 ]
-                pn_create(
+                ir.async_create_issue(
                     self.hass,
-                    (
-                        f"BuzzBridge discovered new thermostat(s): {', '.join(names)}. "
-                        "Entities will be created automatically."
-                    ),
-                    title="BuzzBridge — New Thermostat Found",
-                    notification_id=f"{DOMAIN}_new_thermostat",
+                    DOMAIN,
+                    f"new_thermostat_{'_'.join(new_ids)}",
+                    is_fixable=False,
+                    severity=ir.IssueSeverity.WARNING,
+                    translation_key="new_thermostat_discovered",
+                    translation_placeholders={"names": ", ".join(names)},
                 )
                 _LOGGER.info("New thermostat(s) discovered: %s", names)
 
             if removed_ids:
-                pn_create(
+                ir.async_create_issue(
                     self.hass,
-                    (
-                        f"BuzzBridge lost contact with thermostat ID(s): "
-                        f"{', '.join(removed_ids)}. Entities may become unavailable."
-                    ),
-                    title="BuzzBridge — Thermostat Lost",
-                    notification_id=f"{DOMAIN}_lost_thermostat",
+                    DOMAIN,
+                    f"lost_thermostat_{'_'.join(removed_ids)}",
+                    is_fixable=False,
+                    severity=ir.IssueSeverity.WARNING,
+                    translation_key="thermostat_lost",
+                    translation_placeholders={"ids": ", ".join(removed_ids)},
                 )
                 _LOGGER.warning("Thermostat(s) lost: %s", removed_ids)
 
@@ -183,6 +196,7 @@ class SlowPollCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             CONF_SLOW_POLL_INTERVAL, DEFAULT_SLOW_POLL_MINUTES
         )
         self._api = api
+        self._previously_unavailable = False
 
         super().__init__(
             hass,
@@ -201,13 +215,23 @@ class SlowPollCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             data = await self._api.fetch_slow_poll_data()
         except BeestatAuthError as err:
+            self._previously_unavailable = True
             raise ConfigEntryAuthFailed(
                 f"Authentication failed: {err}"
             ) from err
         except BeestatRateLimitError as err:
-            _LOGGER.warning("Beestat rate limit hit — will retry at next interval")
+            if not self._previously_unavailable:
+                _LOGGER.warning("Beestat API unavailable (rate limited, slow poll)")
+                self._previously_unavailable = True
             raise UpdateFailed(f"Rate limited: {err}") from err
         except BeestatApiError as err:
+            if not self._previously_unavailable:
+                _LOGGER.warning("Beestat API unavailable (slow poll): %s", err)
+                self._previously_unavailable = True
             raise UpdateFailed(f"API error: {err}") from err
+
+        if self._previously_unavailable:
+            _LOGGER.info("Beestat API connection restored (slow poll)")
+            self._previously_unavailable = False
 
         return data

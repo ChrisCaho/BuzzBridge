@@ -1,5 +1,5 @@
 # BuzzBridge - Binary Sensor Platform
-# Rev: 1.2
+# Rev: 1.3
 #
 # Binary sensors for:
 #   - Remote sensor occupancy (motion detection via ecobee sensors)
@@ -14,7 +14,6 @@ from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
@@ -30,6 +29,7 @@ from .const import (
     MANUFACTURER,
 )
 from .coordinator import FastPollCoordinator
+from .entity import BuzzBridgeConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,12 +38,11 @@ PARALLEL_UPDATES = 0
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: BuzzBridgeConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up BuzzBridge binary sensor entities."""
-    data = hass.data[DOMAIN][entry.entry_id]
-    fast_coord: FastPollCoordinator = data["fast_coordinator"]
+    fast_coord = entry.runtime_data.fast_coordinator
 
     entities: list[BinarySensorEntity] = []
 
@@ -129,7 +128,7 @@ class BuzzBridgeOnlineSensor(CoordinatorEntity, BinarySensorEntity):
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
         self._ecobee_id = ecobee_id
-        self._attr_name = "Online"
+        self._attr_translation_key = "online"
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_online"
         self._attr_device_info = device_info
 
@@ -164,7 +163,7 @@ class BuzzBridgeOccupancySensor(CoordinatorEntity, BinarySensorEntity):
     ) -> None:
         super().__init__(coordinator)
         self._sensor_id = str(sensor_id)
-        self._attr_name = "Occupancy"
+        self._attr_translation_key = "occupancy"
         self._attr_unique_id = f"{DOMAIN}_sensor_{sensor_id}_occupancy"
         self._attr_device_info = device_info
 

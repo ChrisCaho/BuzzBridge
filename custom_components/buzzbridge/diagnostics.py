@@ -1,5 +1,5 @@
 # BuzzBridge - Diagnostics Platform
-# Rev: 1.0
+# Rev: 1.1
 #
 # Provides a "Download Diagnostics" button in the HA UI that exports
 # coordinator data with sensitive fields (API key, ecobee tokens) redacted.
@@ -10,10 +10,10 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_API_KEY, DOMAIN
+from .const import CONF_API_KEY
+from .entity import BuzzBridgeConfigEntry
 
 # Keys to redact from config entry data and coordinator payloads
 TO_REDACT = {
@@ -34,13 +34,12 @@ TO_REDACT = {
 
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: BuzzBridgeConfigEntry,
 ) -> dict[str, Any]:
     """Return diagnostics for a BuzzBridge config entry."""
-    data = hass.data[DOMAIN].get(entry.entry_id, {})
-
-    fast_coord = data.get("fast_coordinator")
-    slow_coord = data.get("slow_coordinator")
+    data = entry.runtime_data
+    fast_coord = data.fast_coordinator
+    slow_coord = data.slow_coordinator
 
     return {
         "config_entry": {
@@ -49,19 +48,11 @@ async def async_get_config_entry_diagnostics(
         },
         "fast_poll_data": async_redact_data(
             fast_coord.data or {}, TO_REDACT
-        )
-        if fast_coord
-        else None,
+        ),
         "slow_poll_data": async_redact_data(
             slow_coord.data or {}, TO_REDACT
-        )
-        if slow_coord
-        else None,
-        "fast_poll_interval": str(fast_coord.update_interval)
-        if fast_coord
-        else None,
-        "slow_poll_interval": str(slow_coord.update_interval)
-        if slow_coord
-        else None,
-        "boost_active": fast_coord.is_boosted if fast_coord else None,
+        ),
+        "fast_poll_interval": str(fast_coord.update_interval),
+        "slow_poll_interval": str(slow_coord.update_interval),
+        "boost_active": fast_coord.is_boosted,
     }

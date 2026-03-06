@@ -1,5 +1,5 @@
 # BuzzBridge - Button Platform
-# Rev: 1.2
+# Rev: 1.3
 #
 # Provides a "Boost Polling" button entity per thermostat.
 # When pressed, switches fast polling to every 60 seconds for 60 minutes,
@@ -12,7 +12,6 @@ import logging
 from typing import Any
 
 from homeassistant.components.button import ButtonEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -28,6 +27,7 @@ from .const import (
     MANUFACTURER,
 )
 from .coordinator import FastPollCoordinator
+from .entity import BuzzBridgeConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,12 +36,11 @@ PARALLEL_UPDATES = 0
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: BuzzBridgeConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up BuzzBridge button entities."""
-    data = hass.data[DOMAIN][entry.entry_id]
-    fast_coord: FastPollCoordinator = data["fast_coordinator"]
+    fast_coord = entry.runtime_data.fast_coordinator
 
     entities: list[ButtonEntity] = []
 
@@ -82,7 +81,7 @@ class BuzzBridgeBoostButton(CoordinatorEntity, ButtonEntity):
     """
 
     _attr_has_entity_name = True
-    _attr_icon = "mdi:rocket-launch"
+    _attr_translation_key = "boost_polling"
 
     def __init__(
         self,
@@ -93,7 +92,6 @@ class BuzzBridgeBoostButton(CoordinatorEntity, ButtonEntity):
     ) -> None:
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
-        self._attr_name = "Boost Polling"
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_boost_polling"
         self._attr_device_info = device_info
 

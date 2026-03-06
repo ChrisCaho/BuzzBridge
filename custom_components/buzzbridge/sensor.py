@@ -1,5 +1,5 @@
 # BuzzBridge - Sensor Platform
-# Rev: 1.2
+# Rev: 1.3
 #
 # Creates sensor entities for each thermostat and remote sensor discovered
 # via the Beestat API. Entity types include:
@@ -33,7 +33,6 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     PERCENTAGE,
     UnitOfTemperature,
@@ -73,6 +72,7 @@ from .const import (
     SECONDS_PER_HOUR,
 )
 from .coordinator import FastPollCoordinator, SlowPollCoordinator
+from .entity import BuzzBridgeConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -82,13 +82,12 @@ PARALLEL_UPDATES = 0
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: BuzzBridgeConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up BuzzBridge sensor entities."""
-    data = hass.data[DOMAIN][entry.entry_id]
-    fast_coord: FastPollCoordinator = data["fast_coordinator"]
-    slow_coord: SlowPollCoordinator = data["slow_coordinator"]
+    fast_coord = entry.runtime_data.fast_coordinator
+    slow_coord = entry.runtime_data.slow_coordinator
 
     entities: list[SensorEntity] = []
 
@@ -119,33 +118,29 @@ async def async_setup_entry(
         entities.extend([
             BuzzBridgeThermostatSensor(
                 fast_coord, tstat_id, device_info, tstat_name,
-                key="temperature", name="Temperature",
+                key="temperature", translation_key="temperature",
                 device_class=SensorDeviceClass.TEMPERATURE,
                 unit=UnitOfTemperature.FAHRENHEIT,
                 state_class=SensorStateClass.MEASUREMENT,
-                icon="mdi:thermometer",
             ),
             BuzzBridgeThermostatSensor(
                 fast_coord, tstat_id, device_info, tstat_name,
-                key="humidity", name="Humidity",
+                key="humidity", translation_key="humidity",
                 device_class=SensorDeviceClass.HUMIDITY,
                 unit=PERCENTAGE,
                 state_class=SensorStateClass.MEASUREMENT,
-                icon="mdi:water-percent",
             ),
             BuzzBridgeThermostatSensor(
                 fast_coord, tstat_id, device_info, tstat_name,
-                key="setpoint_heat", name="Heat Setpoint",
+                key="setpoint_heat", translation_key="setpoint_heat",
                 device_class=SensorDeviceClass.TEMPERATURE,
                 unit=UnitOfTemperature.FAHRENHEIT,
-                icon="mdi:thermometer-chevron-up",
             ),
             BuzzBridgeThermostatSensor(
                 fast_coord, tstat_id, device_info, tstat_name,
-                key="setpoint_cool", name="Cool Setpoint",
+                key="setpoint_cool", translation_key="setpoint_cool",
                 device_class=SensorDeviceClass.TEMPERATURE,
                 unit=UnitOfTemperature.FAHRENHEIT,
-                icon="mdi:thermometer-chevron-down",
             ),
         ])
 
@@ -153,8 +148,8 @@ async def async_setup_entry(
         entities.append(
             BuzzBridgeEcobeeSensor(
                 fast_coord, tstat_id, ecobee_id, device_info, tstat_name,
-                key_path=["settings", "hvacMode"], name="HVAC Mode",
-                icon="mdi:hvac",
+                key_path=["settings", "hvacMode"],
+                translation_key="hvac_mode",
             )
         )
         entities.append(
@@ -165,8 +160,8 @@ async def async_setup_entry(
         entities.append(
             BuzzBridgeEcobeeSensor(
                 fast_coord, tstat_id, ecobee_id, device_info, tstat_name,
-                key_path=["runtime", "desiredFanMode"], name="Fan Mode",
-                icon="mdi:fan",
+                key_path=["runtime", "desiredFanMode"],
+                translation_key="fan_mode",
             )
         )
 
@@ -185,26 +180,27 @@ async def async_setup_entry(
             entities.extend([
                 BuzzBridgeAirQualitySensor(
                     fast_coord, tstat_id, ecobee_id, device_info, tstat_name,
-                    aq_key="actualAQScore", name="Air Quality Score",
-                    unit=None, icon="mdi:air-filter",
+                    aq_key="actualAQScore", translation_key="aq_score",
+                    unit=None, device_class=None,
                     aq_type="score",
                 ),
                 BuzzBridgeAirQualitySensor(
                     fast_coord, tstat_id, ecobee_id, device_info, tstat_name,
-                    aq_key="actualCO2", name="CO2",
-                    unit="ppm", icon="mdi:molecule-co2",
+                    aq_key="actualCO2", translation_key="co2",
+                    unit="ppm", device_class=SensorDeviceClass.CO2,
                     aq_type="co2",
                 ),
                 BuzzBridgeAirQualitySensor(
                     fast_coord, tstat_id, ecobee_id, device_info, tstat_name,
-                    aq_key="actualVOC", name="VOC",
-                    unit="ppb", icon="mdi:chemical-weapon",
+                    aq_key="actualVOC", translation_key="voc",
+                    unit="ppb",
+                    device_class=SensorDeviceClass.VOLATILE_ORGANIC_COMPOUNDS_PARTS,
                     aq_type="voc",
                 ),
                 BuzzBridgeAirQualitySensor(
                     fast_coord, tstat_id, ecobee_id, device_info, tstat_name,
-                    aq_key="actualAQAccuracy", name="Air Quality Accuracy",
-                    unit=None, icon="mdi:tune-vertical",
+                    aq_key="actualAQAccuracy", translation_key="aq_accuracy",
+                    unit=None, device_class=None,
                     aq_type="accuracy",
                 ),
             ])
@@ -223,18 +219,16 @@ async def async_setup_entry(
             BuzzBridgeWeatherSensor(
                 fast_coord, tstat_id, ecobee_id, device_info, tstat_name,
                 key_path=["weather", "forecasts", 0, "temperature"],
-                name="Outdoor Temperature",
+                translation_key="outdoor_temperature",
                 device_class=SensorDeviceClass.TEMPERATURE,
                 unit=UnitOfTemperature.FAHRENHEIT,
-                icon="mdi:home-thermometer-outline",
             ),
             BuzzBridgeWeatherSensor(
                 fast_coord, tstat_id, ecobee_id, device_info, tstat_name,
                 key_path=["weather", "forecasts", 0, "relativeHumidity"],
-                name="Outdoor Humidity",
+                translation_key="outdoor_humidity",
                 device_class=SensorDeviceClass.HUMIDITY,
                 unit=PERCENTAGE,
-                icon="mdi:water-percent",
             ),
         ])
 
@@ -242,28 +236,28 @@ async def async_setup_entry(
         entities.extend([
             BuzzBridgeRuntimeSensor(
                 slow_coord, tstat_id, device_info, tstat_name,
-                runtime_key="sum_compressor_cool_1", name="Cooling Runtime Today",
-                icon="mdi:snowflake",
+                runtime_key="sum_compressor_cool_1",
+                translation_key="cooling_runtime",
             ),
             BuzzBridgeRuntimeSensor(
                 slow_coord, tstat_id, device_info, tstat_name,
-                runtime_key="sum_compressor_heat_1", name="Heating Runtime Today",
-                icon="mdi:fire",
+                runtime_key="sum_compressor_heat_1",
+                translation_key="heating_runtime",
             ),
             BuzzBridgeRuntimeSensor(
                 slow_coord, tstat_id, device_info, tstat_name,
-                runtime_key="sum_fan", name="Fan Runtime Today",
-                icon="mdi:fan",
+                runtime_key="sum_fan",
+                translation_key="fan_runtime",
             ),
             BuzzBridgeDegreeDaySensor(
                 slow_coord, tstat_id, device_info, tstat_name,
-                key="sum_cooling_degree_days", name="Cooling Degree Days",
-                icon="mdi:weather-sunny",
+                key="sum_cooling_degree_days",
+                translation_key="cooling_degree_days",
             ),
             BuzzBridgeDegreeDaySensor(
                 slow_coord, tstat_id, device_info, tstat_name,
-                key="sum_heating_degree_days", name="Heating Degree Days",
-                icon="mdi:weather-snowy",
+                key="sum_heating_degree_days",
+                translation_key="heating_degree_days",
             ),
         ])
 
@@ -303,11 +297,10 @@ async def async_setup_entry(
                 fast_coord, sensor_id, device_info,
                 parent_name, sensor_name,
                 value_key="temperature",
-                name="Temperature",
+                translation_key="remote_temperature",
                 device_class=SensorDeviceClass.TEMPERATURE,
                 unit=UnitOfTemperature.FAHRENHEIT,
                 state_class=SensorStateClass.MEASUREMENT,
-                icon="mdi:thermometer",
             )
         )
 
@@ -318,11 +311,10 @@ async def async_setup_entry(
                     fast_coord, sensor_id, device_info,
                     parent_name, sensor_name,
                     value_key="humidity",
-                    name="Humidity",
+                    translation_key="remote_humidity",
                     device_class=SensorDeviceClass.HUMIDITY,
                     unit=PERCENTAGE,
                     state_class=SensorStateClass.MEASUREMENT,
-                    icon="mdi:water-percent",
                 )
             )
 
@@ -347,23 +339,21 @@ class BuzzBridgeThermostatSensor(CoordinatorEntity, SensorEntity):
         tstat_name: str,
         *,
         key: str,
-        name: str,
+        translation_key: str,
         device_class: SensorDeviceClass | None = None,
         unit: str | None = None,
         state_class: SensorStateClass | None = None,
-        icon: str | None = None,
         entity_category: EntityCategory | None = None,
     ) -> None:
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
         self._key = key
-        self._attr_name = name
+        self._attr_translation_key = translation_key
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_{key}"
         self._attr_device_info = device_info
         self._attr_device_class = device_class
         self._attr_native_unit_of_measurement = unit
         self._attr_state_class = state_class
-        self._attr_icon = icon
         self._attr_entity_category = entity_category
 
     @property
@@ -389,17 +379,19 @@ class BuzzBridgeEcobeeSensor(CoordinatorEntity, SensorEntity):
         tstat_name: str,
         *,
         key_path: list[str | int],
-        name: str,
-        icon: str | None = None,
+        translation_key: str,
+        device_class: SensorDeviceClass | None = None,
+        unit: str | None = None,
     ) -> None:
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
         self._ecobee_id = ecobee_id
         self._key_path = key_path
-        self._attr_name = name
+        self._attr_translation_key = translation_key
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_{'_'.join(str(k) for k in key_path)}"
         self._attr_device_info = device_info
-        self._attr_icon = icon
+        self._attr_device_class = device_class
+        self._attr_native_unit_of_measurement = unit
 
     def _get_ecobee_data(self) -> dict[str, Any]:
         """Get the ecobee thermostat data dict. Safe if any key is null."""
@@ -428,6 +420,7 @@ class BuzzBridgeRunningEquipmentSensor(CoordinatorEntity, SensorEntity):
     """Shows currently running equipment in human-readable form."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "running_equipment"
 
     def __init__(
         self,
@@ -440,10 +433,8 @@ class BuzzBridgeRunningEquipmentSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
         self._ecobee_id = ecobee_id
-        self._attr_name = "Running Equipment"
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_running_equipment"
         self._attr_device_info = device_info
-        self._attr_icon = "mdi:hvac"
 
     @property
     def native_value(self) -> str:
@@ -461,6 +452,7 @@ class BuzzBridgeHoldSensor(CoordinatorEntity, SensorEntity):
     """Shows the current hold status with details as attributes."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "hold_status"
 
     def __init__(
         self,
@@ -473,10 +465,8 @@ class BuzzBridgeHoldSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
         self._ecobee_id = ecobee_id
-        self._attr_name = "Hold Status"
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_hold_status"
         self._attr_device_info = device_info
-        self._attr_icon = "mdi:hand-back-left"
 
     def _get_active_hold(self) -> dict[str, Any] | None:
         """Find the first running hold event."""
@@ -547,9 +537,9 @@ class BuzzBridgeAirQualitySensor(CoordinatorEntity, SensorEntity):
         tstat_name: str,
         *,
         aq_key: str,
-        name: str,
+        translation_key: str,
         unit: str | None,
-        icon: str,
+        device_class: SensorDeviceClass | None,
         aq_type: str,
     ) -> None:
         super().__init__(coordinator)
@@ -557,11 +547,11 @@ class BuzzBridgeAirQualitySensor(CoordinatorEntity, SensorEntity):
         self._ecobee_id = ecobee_id
         self._aq_key = aq_key
         self._aq_type = aq_type
-        self._attr_name = name
+        self._attr_translation_key = translation_key
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_{aq_key}"
         self._attr_device_info = device_info
         self._attr_native_unit_of_measurement = unit
-        self._attr_icon = icon
+        self._attr_device_class = device_class
         if unit:
             self._attr_state_class = SensorStateClass.MEASUREMENT
 
@@ -572,7 +562,6 @@ class BuzzBridgeAirQualitySensor(CoordinatorEntity, SensorEntity):
         ecobee_all = self.coordinator.data.get(DATA_ECOBEE_THERMOSTATS) or {}
         ecobee = ecobee_all.get(self._ecobee_id) or {}
         return ecobee.get("runtime") or {}
-        )
 
     @property
     def native_value(self) -> float | int | str | None:
@@ -623,6 +612,7 @@ class BuzzBridgeFilterSensor(CoordinatorEntity, SensorEntity):
     """Filter runtime and estimated days remaining."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "filter_runtime"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(
@@ -634,10 +624,8 @@ class BuzzBridgeFilterSensor(CoordinatorEntity, SensorEntity):
     ) -> None:
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
-        self._attr_name = "Filter Runtime"
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_filter_runtime"
         self._attr_device_info = device_info
-        self._attr_icon = "mdi:air-filter"
         self._attr_native_unit_of_measurement = UnitOfTime.HOURS
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
 
@@ -708,16 +696,14 @@ class BuzzBridgeRuntimeSensor(CoordinatorEntity, SensorEntity):
         tstat_name: str,
         *,
         runtime_key: str,
-        name: str,
-        icon: str,
+        translation_key: str,
     ) -> None:
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
         self._runtime_key = runtime_key
-        self._attr_name = name
+        self._attr_translation_key = translation_key
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_{runtime_key}"
         self._attr_device_info = device_info
-        self._attr_icon = icon
         self._attr_native_unit_of_measurement = UnitOfTime.HOURS
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
 
@@ -774,16 +760,14 @@ class BuzzBridgeDegreeDaySensor(CoordinatorEntity, SensorEntity):
         tstat_name: str,
         *,
         key: str,
-        name: str,
-        icon: str,
+        translation_key: str,
     ) -> None:
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
         self._key = key
-        self._attr_name = name
+        self._attr_translation_key = translation_key
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_{key}"
         self._attr_device_info = device_info
-        self._attr_icon = icon
         self._attr_native_unit_of_measurement = DEGREE_DAY_UNIT
         self._attr_state_class = SensorStateClass.TOTAL_INCREASING
 
@@ -816,6 +800,7 @@ class BuzzBridgeComfortSensor(CoordinatorEntity, SensorEntity):
     """Comfort index: 0-100 based on temperature accuracy and humidity."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "comfort_index"
 
     def __init__(
         self,
@@ -826,10 +811,8 @@ class BuzzBridgeComfortSensor(CoordinatorEntity, SensorEntity):
     ) -> None:
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
-        self._attr_name = "Comfort Index"
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_comfort_index"
         self._attr_device_info = device_info
-        self._attr_icon = "mdi:emoticon-happy-outline"
         self._attr_native_unit_of_measurement = PERCENTAGE
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
@@ -850,6 +833,7 @@ class BuzzBridgeDifferentialSensor(CoordinatorEntity, SensorEntity):
     """Indoor vs outdoor temperature differential."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "temp_differential"
 
     def __init__(
         self,
@@ -862,10 +846,8 @@ class BuzzBridgeDifferentialSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
         self._ecobee_id = ecobee_id
-        self._attr_name = "Indoor/Outdoor Differential"
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_temp_differential"
         self._attr_device_info = device_info
-        self._attr_icon = "mdi:thermometer-lines"
         self._attr_device_class = SensorDeviceClass.TEMPERATURE
         self._attr_native_unit_of_measurement = UnitOfTemperature.FAHRENHEIT
         self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -902,22 +884,20 @@ class BuzzBridgeRemoteSensorEntity(CoordinatorEntity, SensorEntity):
         sensor_name: str,
         *,
         value_key: str,
-        name: str,
+        translation_key: str,
         device_class: SensorDeviceClass | None = None,
         unit: str | None = None,
         state_class: SensorStateClass | None = None,
-        icon: str | None = None,
     ) -> None:
         super().__init__(coordinator)
         self._sensor_id = str(sensor_id)
         self._value_key = value_key
-        self._attr_name = name
+        self._attr_translation_key = translation_key
         self._attr_unique_id = f"{DOMAIN}_sensor_{sensor_id}_{value_key}"
         self._attr_device_info = device_info
         self._attr_device_class = device_class
         self._attr_native_unit_of_measurement = unit
         self._attr_state_class = state_class
-        self._attr_icon = icon
 
     @property
     def native_value(self) -> Any:

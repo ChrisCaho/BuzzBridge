@@ -139,6 +139,221 @@ The integration uses two DataUpdateCoordinators with batch API requests:
 - No data is sent anywhere except to the Beestat API to retrieve your thermostat data
 - BuzzBridge is fully open source — audit the code yourself
 
+## Data Update Mechanism
+
+BuzzBridge uses a dual-coordinator polling architecture. Both coordinators use batch API requests, meaning each poll cycle sends a single HTTP request to Beestat regardless of how many thermostats are on the account.
+
+### Fast Poll (default: 5 minutes)
+Fetches real-time thermostat data in one batch request:
+- Current temperature and humidity
+- Heat and cool setpoints
+- HVAC mode, fan mode, running equipment
+- Hold status (type, temperatures, end time)
+- Air quality readings (CO2, VOC, AQ score, accuracy) on Premium models
+- Remote sensor readings (temperature, humidity, occupancy)
+- Filter runtime status
+- Weather data from ecobee
+
+### Slow Poll (default: 30 minutes)
+Fetches daily summary data in one batch request:
+- Cooling, heating, and fan runtime totals for the current day
+- Heating and cooling degree days
+
+### Configuring Poll Intervals
+Both intervals are configurable via the Options flow: **Settings > Devices & Services > BuzzBridge > Configure**. The allowed range is 3 to 60 minutes for each. Changes take effect immediately without restarting Home Assistant.
+
+### Boost Mode
+Each thermostat exposes a **Boost Polling** button entity. Pressing it switches the fast poll interval to every 60 seconds for 60 minutes, then automatically reverts to the configured interval. Pressing the button again while boost is active resets the 60-minute timer. This is useful for monitoring real-time changes or debugging.
+
+### Beestat Server Cache
+The Beestat API applies server-side caching: sync responses are cached for 3 minutes and runtime summary reads for up to 15 minutes. As a result, data displayed in Home Assistant is typically 3-5 minutes behind real-time ecobee readings. Setting the fast poll interval below 3 minutes will not yield fresher data.
+
+---
+
+## Supported Devices
+
+BuzzBridge supports all ecobee thermostat models available through Beestat:
+
+| Model Code | Device Name | Notes |
+|------------|-------------|-------|
+| `apolloSmart` | ecobee SmartThermostat | |
+| `aresSmart` | ecobee Smart Thermostat Premium | Includes air quality sensors (CO2, VOC, AQ score) |
+| `nikeSmart` | ecobee Smart Thermostat Enhanced | |
+| `vulcanSmart` | ecobee Smart Thermostat Essential | |
+| `athenaSmart` | ecobee3 | |
+| `idtSmart` | ecobee3 lite | |
+| `corSmart` | Carrier Cor | |
+| `siSmart` | ecobee Si | |
+
+All ecobee remote sensors are also supported:
+- **Room sensors** — temperature and occupancy
+- **Door/window sensors** — temperature and occupancy
+- **Built-in thermostat sensor** — temperature, humidity, and occupancy
+
+Remote sensors are automatically discovered and registered as child devices of their parent thermostat.
+
+---
+
+## Supported Functions
+
+### Sensor Entities (per thermostat)
+
+**Core readings (fast poll):**
+- Temperature
+- Humidity
+- Heat Setpoint
+- Cool Setpoint
+- HVAC Mode (auto, heat, cool, off)
+- Running Equipment (human-readable, e.g., "Cooling Stage 1, Fan")
+- Fan Mode (auto, on)
+- Hold Status (None, Hold, Indefinite Hold) with detail attributes
+
+**Air quality (fast poll, ecobee Premium only):**
+- Air Quality Score (0-100, higher = better)
+- CO2 (ppm)
+- VOC (ppb)
+- Air Quality Accuracy (BME680 calibration state: Stabilizing through Full)
+
+**Filter status (fast poll):**
+- Filter Runtime (total hours since last change, diagnostic entity)
+- Days Remaining (estimated, exposed as attribute)
+
+**Daily runtimes (slow poll):**
+- Cooling Runtime Today (hours)
+- Heating Runtime Today (hours)
+- Fan Runtime Today (hours)
+- Cooling Degree Days
+- Heating Degree Days
+
+**Calculated sensors (fast poll):**
+- Comfort Index (0-100%, based on temperature accuracy and humidity)
+- Indoor/Outdoor Differential (temperature difference in degrees)
+
+**Weather (fast poll, disabled by default):**
+- Outdoor Temperature
+- Outdoor Humidity
+
+### Binary Sensor Entities
+
+- **Online** (per thermostat) — connectivity status, diagnostic entity
+- **Occupancy** (per remote sensor) — motion detection
+
+### Button Entities
+
+- **Boost Polling** (per thermostat) — activates 1-minute polling for 60 minutes
+
+### Diagnostic Support
+
+BuzzBridge supports the Home Assistant diagnostics platform. You can download a diagnostics dump from **Settings > Devices & Services > BuzzBridge > 3 dots menu > Download Diagnostics**. Sensitive data (API key, tokens, serial numbers, MAC addresses, location data) is automatically redacted.
+
+---
+
+## Known Limitations
+
+- **Read-only** — BuzzBridge cannot control your thermostat. It only reads data through the Beestat API. Use the native ecobee or HomeKit integration for thermostat control.
+- **Data is 3-5 minutes behind real-time** — Beestat applies server-side caching (3 min on sync, 15 min on runtime summaries). This is a Beestat platform constraint, not a BuzzBridge limitation.
+- **API rate limit of ~30 requests/minute** — Each batch request (fast poll or slow poll) counts as 1 request regardless of how many thermostats you have. Under normal operation with defaults, BuzzBridge uses approximately 1 request every 5 minutes plus 1 every 30 minutes.
+- **Air quality sensors require ecobee Premium** — Only the `aresSmart` model has the Bosch BME680 gas sensor. Other models will not expose CO2, VOC, AQ score, or accuracy entities.
+- **Remote sensors provide temperature and occupancy only** — Humidity is only available on the thermostat's built-in sensor. Remote sensors cannot be directly controlled.
+- **Beestat account required** — A free [Beestat](https://beestat.io/) account linked to your ecobee is required. BuzzBridge does not communicate directly with ecobee.
+- **ecobee developer API closed** — ecobee closed its developer API to new registrations in March 2024. Beestat is grandfathered in. This is why BuzzBridge exists.
+- **Weather sensors are basic** — Weather data comes from ecobee's built-in weather feed, which provides temperature and humidity only. For richer weather data, use a dedicated weather integration.
+
+---
+
+## Automation Examples
+
+### Alert when air quality score drops below threshold
+
+```yaml
+automation:
+  - alias: "BuzzBridge - Poor Air Quality Alert"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.living_room_air_quality_score
+        below: 40
+        for:
+          minutes: 5
+    action:
+      - service: notify.notify
+        data:
+          title: "Poor Air Quality"
+          message: >
+            Air quality score dropped to {{ states('sensor.living_room_air_quality_score') }}.
+            CO2: {{ states('sensor.living_room_co2') }} ppm.
+            VOC: {{ states('sensor.living_room_voc') }} ppb.
+            Consider opening windows or running ventilation.
+```
+
+### Alert on short cycling detection
+
+```yaml
+automation:
+  - alias: "BuzzBridge - Short Cycling Warning"
+    trigger:
+      - platform: state
+        entity_id: sensor.living_room_running_equipment
+    condition:
+      - condition: template
+        value_template: >
+          {% set changes = states.sensor.living_room_running_equipment.last_changed %}
+          {% set history = state_attr('sensor.living_room_running_equipment', 'history') %}
+          {{ (now() - changes).total_seconds() < 600 }}
+    action:
+      - service: notify.notify
+        data:
+          title: "HVAC Short Cycling Detected"
+          message: >
+            Your thermostat equipment is cycling frequently.
+            Current status: {{ states('sensor.living_room_running_equipment') }}.
+            This may indicate an oversized system, dirty filter, or refrigerant issue.
+```
+
+### Turn on a fan when CO2 exceeds 1000 ppm
+
+```yaml
+automation:
+  - alias: "BuzzBridge - High CO2 Ventilation"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.living_room_co2
+        above: 1000
+        for:
+          minutes: 5
+    action:
+      - service: fan.turn_on
+        target:
+          entity_id: fan.whole_house_fan
+      - service: notify.notify
+        data:
+          title: "High CO2 - Ventilating"
+          message: >
+            CO2 is {{ states('sensor.living_room_co2') }} ppm (EPA max: 1000 ppm).
+            Turning on ventilation fan.
+```
+
+### Send notification when thermostat goes offline
+
+```yaml
+automation:
+  - alias: "BuzzBridge - Thermostat Offline Alert"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.living_room_online
+        to: "off"
+        for:
+          minutes: 10
+    action:
+      - service: notify.notify
+        data:
+          title: "Thermostat Offline"
+          message: >
+            {{ trigger.to_state.attributes.friendly_name }} has been offline
+            for 10 minutes. Check your thermostat's Wi-Fi connection and power.
+```
+
+---
+
 ## Troubleshooting
 
 ### Enable Debug Logging
@@ -149,12 +364,22 @@ logger:
   logs:
     custom_components.buzzbridge: debug
 ```
+Then restart Home Assistant. Debug logs will appear in **Settings > System > Logs** and in the `home-assistant.log` file. Remember to disable debug logging after troubleshooting to avoid filling your log file.
+
+### Download Diagnostics
+Go to **Settings > Devices & Services > BuzzBridge > 3 dots menu > Download Diagnostics**. The diagnostics file includes coordinator data with sensitive fields (API key, tokens, location, serial numbers) automatically redacted. This is the most useful artifact when reporting issues.
 
 ### Common Issues
+
 - **"Invalid API key"** — Ensure the key is exactly 40 hex characters. Find it at app.beestat.io → Menu → API Key.
-- **"Cannot connect"** — Check your internet connection and that beestat.io is accessible.
-- **Air quality shows unavailable** — Only ecobee Premium models (aresSmart) have air quality sensors.
-- **Stale data** — Beestat caches sync responses for 3 minutes. Data may lag by up to 3 min.
+- **"Cannot connect"** — Check your internet connection and that beestat.io is accessible. The Beestat API endpoint is `https://api.beestat.io/`.
+- **Air quality shows unavailable** — Only ecobee Premium models (aresSmart) have air quality sensors. Other models will show these entities as unavailable or they will not be created at all.
+- **Stale data** — Beestat caches sync responses for 3 minutes and runtime summaries for up to 15 minutes. Data may lag by 3-5 minutes behind real-time. Setting the poll interval below 3 minutes will not help.
+- **Rate limit errors** — If you see "Rate limited" warnings in your logs, increase your poll intervals in the integration options. The Beestat API allows approximately 30 requests per minute. Under normal BuzzBridge operation, you should not hit this limit unless other tools are also using your API key.
+- **Entities show "unavailable"** — This usually means the thermostat has lost its internet connection. Check the Online binary sensor and your thermostat's Wi-Fi status.
+- **Runtime sensors show 0 or None** — Runtime summaries are updated on the slow poll cycle (default 30 min). After initial setup, wait for the first slow poll to complete. If runtime data remains empty, confirm your Beestat account shows runtime data at app.beestat.io.
+- **Boost polling not working** — Check the button entity attributes to confirm `boosted: true`. Boost mode reverts automatically after 60 minutes. If the integration was reloaded or HA restarted during boost, the boost state is lost.
+- **"ConfigEntryAuthFailed"** — Your API key may have been revoked or your Beestat session expired. Go to **Settings > Devices & Services > BuzzBridge** and reconfigure with a fresh API key from app.beestat.io.
 
 ## License
 

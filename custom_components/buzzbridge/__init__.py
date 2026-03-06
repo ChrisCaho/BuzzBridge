@@ -1,5 +1,5 @@
 # BuzzBridge - Integration Setup
-# Rev: 1.2
+# Rev: 1.3
 #
 # Entry point for the BuzzBridge custom integration. Handles:
 #   - Creating the BeestatApi client with HA's shared aiohttp session
@@ -7,12 +7,12 @@
 #   - Forwarding platform setup (sensor, binary_sensor, button)
 #   - Options update listener for poll interval changes
 #   - Clean unload
+#   - Device cleanup (prevents removing active devices)
 
 from __future__ import annotations
 
 import logging
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -22,33 +22,34 @@ from .const import (
     CONF_API_KEY,
     CONF_FAST_POLL_INTERVAL,
     CONF_SLOW_POLL_INTERVAL,
+    DATA_SENSORS,
+    DATA_THERMOSTATS,
     DEFAULT_FAST_POLL_MINUTES,
     DEFAULT_SLOW_POLL_MINUTES,
     DOMAIN,
     PLATFORMS,
 )
 from .coordinator import FastPollCoordinator, SlowPollCoordinator
+from .entity import BuzzBridgeConfigEntry, BuzzBridgeData
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> bool:
     """Set up BuzzBridge from a config entry."""
-    hass.data.setdefault(DOMAIN, {})
-
     session = async_get_clientsession(hass)
     api = BeestatApi(session, entry.data[CONF_API_KEY])
 
     fast_coordinator = FastPollCoordinator(hass, api, entry)
     slow_coordinator = SlowPollCoordinator(hass, api, entry)
 
-    # Store data BEFORE first refresh so async_unload_entry can clean up
-    # if ConfigEntryNotReady is raised during refresh
-    hass.data[DOMAIN][entry.entry_id] = {
-        "api": api,
-        "fast_coordinator": fast_coordinator,
-        "slow_coordinator": slow_coordinator,
-    }
+    # Store runtime data BEFORE first refresh so async_unload_entry can clean
+    # up if ConfigEntryNotReady is raised during refresh
+    entry.runtime_data = BuzzBridgeData(
+        api=api,
+        fast_coordinator=fast_coordinator,
+        slow_coordinator=slow_coordinator,
+    )
 
     # Fetch initial data — raises ConfigEntryNotReady on failure
     await fast_coordinator.async_config_entry_first_refresh()
@@ -64,14 +65,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def _async_options_updated(
+    hass: HomeAssistant, entry: BuzzBridgeConfigEntry
+) -> None:
     """Handle options update — adjust poll intervals without restart."""
-    data = hass.data[DOMAIN].get(entry.entry_id)
-    if not data:
-        return
-
-    fast_coord: FastPollCoordinator = data["fast_coordinator"]
-    slow_coord: SlowPollCoordinator = data["slow_coordinator"]
+    data = entry.runtime_data
 
     fast_minutes = entry.options.get(
         CONF_FAST_POLL_INTERVAL, DEFAULT_FAST_POLL_MINUTES
@@ -80,8 +78,8 @@ async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> Non
         CONF_SLOW_POLL_INTERVAL, DEFAULT_SLOW_POLL_MINUTES
     )
 
-    fast_coord.update_poll_interval(fast_minutes)
-    slow_coord.update_poll_interval(slow_minutes)
+    data.fast_coordinator.update_poll_interval(fast_minutes)
+    data.slow_coordinator.update_poll_interval(slow_minutes)
 
     _LOGGER.info(
         "BuzzBridge poll intervals updated: fast=%dmin, slow=%dmin",
@@ -90,12 +88,13 @@ async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> Non
     )
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(
+    hass: HomeAssistant, entry: BuzzBridgeConfigEntry
+) -> bool:
     """Unload a BuzzBridge config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id, None)
         _LOGGER.info("BuzzBridge unloaded for entry %s", entry.entry_id)
 
     return unload_ok
@@ -103,7 +102,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_remove_config_entry_device(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: BuzzBridgeConfigEntry,
     device_entry: dr.DeviceEntry,
 ) -> bool:
     """Allow manual removal of BuzzBridge devices from the UI.
@@ -112,12 +111,8 @@ async def async_remove_config_entry_device(
     (e.g., a thermostat was removed from the ecobee account or a remote sensor
     was deleted). Active devices cannot be removed.
     """
-    data = hass.data[DOMAIN].get(entry.entry_id)
-    if not data:
-        return True  # Integration data gone, allow removal
-
-    fast_coord = data.get("fast_coordinator")
-    if fast_coord is None or fast_coord.data is None:
+    fast_coord = entry.runtime_data.fast_coordinator
+    if fast_coord.data is None:
         return True  # No data to check against, allow removal
 
     # Check if any device identifier is still present in coordinator data
@@ -127,7 +122,7 @@ async def async_remove_config_entry_device(
         device_id = identifier[1]
 
         # Check thermostats (identifier = tstat_id)
-        if device_id in (fast_coord.data.get("thermostats") or {}):
+        if device_id in (fast_coord.data.get(DATA_THERMOSTATS) or {}):
             _LOGGER.warning(
                 "Cannot remove device %s — thermostat still active", device_id
             )
@@ -136,7 +131,7 @@ async def async_remove_config_entry_device(
         # Check remote sensors (identifier = "sensor_{sensor_id}")
         if device_id.startswith("sensor_"):
             sensor_id = device_id[7:]  # Strip "sensor_" prefix
-            sensors = fast_coord.data.get("sensors") or {}
+            sensors = fast_coord.data.get(DATA_SENSORS) or {}
             sensor = sensors.get(sensor_id, {})
             if sensor and not sensor.get("deleted") and not sensor.get("inactive"):
                 _LOGGER.warning(

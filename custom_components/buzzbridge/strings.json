@@ -20,6 +20,16 @@
         "data_description": {
           "api_key": "Your new 40-character Beestat API key"
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure BuzzBridge",
+        "description": "Enter a new Beestat API key to replace the current one.",
+        "data": {
+          "api_key": "API Key"
+        },
+        "data_description": {
+          "api_key": "Your 40-character Beestat API key"
+        }
       }
     },
     "error": {
@@ -30,7 +40,8 @@
     },
     "abort": {
       "already_configured": "This Beestat account is already configured.",
-      "reauth_successful": "Re-authentication successful."
+      "reauth_successful": "Re-authentication successful.",
+      "reconfigure_successful": "Reconfiguration successful."
     }
   },
   "options": {
@@ -47,6 +58,62 @@
           "slow_poll_interval": "Runtime summaries, settings (3-60 min, default 30)"
         }
       }
+    }
+  },
+  "exceptions": {
+    "api_error": {
+      "message": "Error communicating with Beestat API: {error}"
+    },
+    "auth_error": {
+      "message": "Authentication failed. Check your Beestat API key."
+    },
+    "rate_limited": {
+      "message": "Beestat API rate limit reached. Will retry at next poll interval."
+    }
+  },
+  "issues": {
+    "new_thermostat_discovered": {
+      "title": "New thermostat discovered",
+      "description": "BuzzBridge discovered new thermostat(s): {names}. Restart Home Assistant or reload the integration to create entities."
+    },
+    "thermostat_lost": {
+      "title": "Thermostat lost",
+      "description": "BuzzBridge lost contact with thermostat ID(s): {ids}. Entities may become unavailable. Check your ecobee account."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "temperature": { "name": "Temperature" },
+      "humidity": { "name": "Humidity" },
+      "setpoint_heat": { "name": "Heat Setpoint" },
+      "setpoint_cool": { "name": "Cool Setpoint" },
+      "hvac_mode": { "name": "HVAC Mode" },
+      "running_equipment": { "name": "Running Equipment" },
+      "fan_mode": { "name": "Fan Mode" },
+      "hold_status": { "name": "Hold Status" },
+      "aq_score": { "name": "Air Quality Score" },
+      "co2": { "name": "CO2" },
+      "voc": { "name": "VOC" },
+      "aq_accuracy": { "name": "Air Quality Accuracy" },
+      "filter_runtime": { "name": "Filter Runtime" },
+      "outdoor_temperature": { "name": "Outdoor Temperature" },
+      "outdoor_humidity": { "name": "Outdoor Humidity" },
+      "cooling_runtime": { "name": "Cooling Runtime Today" },
+      "heating_runtime": { "name": "Heating Runtime Today" },
+      "fan_runtime": { "name": "Fan Runtime Today" },
+      "cooling_degree_days": { "name": "Cooling Degree Days" },
+      "heating_degree_days": { "name": "Heating Degree Days" },
+      "comfort_index": { "name": "Comfort Index" },
+      "temp_differential": { "name": "Indoor/Outdoor Differential" },
+      "remote_temperature": { "name": "Temperature" },
+      "remote_humidity": { "name": "Humidity" }
+    },
+    "binary_sensor": {
+      "online": { "name": "Online" },
+      "occupancy": { "name": "Occupancy" }
+    },
+    "button": {
+      "boost_polling": { "name": "Boost Polling" }
     }
   }
 }

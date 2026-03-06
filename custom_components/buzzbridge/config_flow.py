@@ -1,5 +1,5 @@
 # BuzzBridge - Config Flow
-# Rev: 1.2
+# Rev: 1.3
 #
 # Handles the UI setup flow for BuzzBridge:
 #   1. User enters their Beestat API key (40-character hex string)
@@ -142,6 +142,49 @@ class BuzzBridgeConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reauth_confirm",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_API_KEY): str,
+                }
+            ),
+            errors=errors,
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle reconfiguration — allow changing API key from Configure menu."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            api_key = user_input[CONF_API_KEY].strip().lower()
+
+            if len(api_key) != API_KEY_LENGTH or not all(
+                c in "0123456789abcdef" for c in api_key
+            ):
+                errors[CONF_API_KEY] = "invalid_api_key_format"
+            else:
+                try:
+                    session = async_get_clientsession(self.hass)
+                    api = BeestatApi(session, api_key)
+                    await api.validate_api_key()
+                except BeestatAuthError:
+                    errors[CONF_API_KEY] = "invalid_auth"
+                except BeestatApiError:
+                    errors["base"] = "cannot_connect"
+                except Exception:
+                    _LOGGER.exception("Unexpected error during reconfigure")
+                    errors["base"] = "unknown"
+
+            if not errors:
+                reconfigure_entry = self._get_reconfigure_entry()
+                return self.async_update_reload_and_abort(
+                    reconfigure_entry,
+                    data={**reconfigure_entry.data, CONF_API_KEY: api_key},
+                )
+
+        return self.async_show_form(
+            step_id="reconfigure",
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_API_KEY): str,
