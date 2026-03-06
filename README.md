@@ -66,7 +66,7 @@ Higher numbers = more energy needed. Useful for:
 - Seasonal energy planning
 
 ### Calculated Sensors
-- **Comfort Index** — 0-100% based on temperature accuracy (70% weight) and humidity comfort (30% weight)
+- **Comfort Index** — 0-100% combining temperature (70% weight) and humidity (30% weight). In auto mode, 100% means the temperature is anywhere within the heat-cool setpoint range and humidity is 30-50%. In heat-only or cool-only mode, 100% means at or past the setpoint in the comfortable direction. The score degrades linearly as conditions move outside the comfort zone, reaching 0% at 5°F beyond the range or at extreme humidity.
 - **Indoor/Outdoor Differential** — temperature difference showing insulation effectiveness
 
 ### Remote Sensors
@@ -233,7 +233,7 @@ Remote sensors are automatically discovered and registered as child devices of t
 - Heating Degree Days
 
 **Calculated sensors (fast poll):**
-- Comfort Index (0-100%, based on temperature accuracy and humidity)
+- Comfort Index (0-100%, within setpoint range + ideal humidity = 100%)
 - Indoor/Outdoor Differential (temperature difference in degrees)
 
 **Weather (fast poll, disabled by default):**

@@ -824,7 +824,8 @@ class BuzzBridgeComfortSensor(CoordinatorEntity, SensorEntity):
         tstat = self.coordinator.data.get(DATA_THERMOSTATS, {}).get(self._tstat_id, {})
         return comfort_index(
             tstat.get("temperature"),
-            tstat.get("setpoint_cool") or tstat.get("setpoint_heat"),
+            tstat.get("setpoint_heat"),
+            tstat.get("setpoint_cool"),
             tstat.get("humidity"),
         )
 

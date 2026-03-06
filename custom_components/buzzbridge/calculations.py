@@ -1,5 +1,5 @@
 # BuzzBridge - Calculated Sensor Logic
-# Rev: 1.1
+# Rev: 1.2
 #
 # Pure functions that derive useful metrics from raw thermostat data.
 # These power the "calculated sensor" entities in BuzzBridge.
@@ -177,31 +177,56 @@ def detect_short_cycling(
 
 def comfort_index(
     current_temp: float | None,
-    target_temp: float | None,
+    setpoint_heat: float | None,
+    setpoint_cool: float | None,
     current_humidity: float | None,
 ) -> float | None:
     """Calculate a 0-100 comfort index.
 
-    Perfect comfort (100) = exactly at setpoint with humidity 30-50%.
+    Perfect comfort (100) = within the setpoint range with humidity 30-50%.
     Combines temperature accuracy (70% weight) and humidity comfort (30%).
 
-    The temperature component uses a 5°F tolerance — beyond that, comfort
-    drops to 0 for the temp portion. Humidity uses a linear ramp outside
-    the 30-50% ideal range.
+    Temperature scoring by HVAC mode:
+    - Auto (both setpoints): 100 anywhere within heat-cool range, degrades
+      linearly when outside the range up to TOLERANCE beyond.
+    - Heat only: 100 at or above heat setpoint, degrades below.
+    - Cool only: 100 at or below cool setpoint, degrades above.
+    - Off (no setpoints): returns None.
+
+    The tolerance is 5°F — beyond that distance outside the range,
+    the temperature component drops to 0. Humidity uses a linear ramp
+    outside the 30-50% ideal range.
 
     Args:
         current_temp: Actual indoor temperature.
-        target_temp: Desired setpoint temperature.
+        setpoint_heat: Heat setpoint (None if not heating).
+        setpoint_cool: Cool setpoint (None if not cooling).
         current_humidity: Current relative humidity percentage.
 
     Returns:
         Comfort score 0-100, or None if insufficient data.
     """
-    if current_temp is None or target_temp is None:
+    if current_temp is None:
+        return None
+    if setpoint_heat is None and setpoint_cool is None:
         return None
 
-    # Temperature component: 100 at setpoint, 0 at ±COMFORT_TEMP_TOLERANCE_F or more
-    temp_diff = abs(current_temp - target_temp)
+    # Temperature component: how far outside the comfort range
+    if setpoint_heat is not None and setpoint_cool is not None:
+        # Auto mode: comfort range is [heat, cool]
+        if current_temp < setpoint_heat:
+            temp_diff = setpoint_heat - current_temp
+        elif current_temp > setpoint_cool:
+            temp_diff = current_temp - setpoint_cool
+        else:
+            temp_diff = 0.0  # Within range = perfect
+    elif setpoint_heat is not None:
+        # Heat only: comfortable at or above setpoint
+        temp_diff = max(0.0, setpoint_heat - current_temp)
+    else:
+        # Cool only: comfortable at or below setpoint
+        temp_diff = max(0.0, current_temp - setpoint_cool)
+
     temp_score = max(0.0, 100.0 - (temp_diff / COMFORT_TEMP_TOLERANCE_F) * 100.0)
 
     # Humidity component: 100 within 30-50%, degrading linearly outside
