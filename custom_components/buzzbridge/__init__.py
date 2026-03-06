@@ -52,10 +52,18 @@ def _migrate_entity_ids(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> No
     ent_reg = er.async_get(hass)
     entries = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
 
+    _LOGGER.warning(
+        "BuzzBridge entity migration: prefix=%r, found %d entities for entry %s",
+        prefix_slug, len(entries), entry.entry_id,
+    )
+
+    migrated = 0
+    skipped = 0
     for entity_entry in entries:
         old_slug = entity_entry.entity_id.split(".", 1)[1]
 
         if old_slug.startswith(f"{prefix_slug}_"):
+            skipped += 1
             continue  # Already has the prefix
 
         new_entity_id = f"{entity_entry.domain}.{prefix_slug}_{old_slug}"
@@ -74,12 +82,18 @@ def _migrate_entity_ids(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> No
             )
             continue
 
-        _LOGGER.info(
+        _LOGGER.warning(
             "Migrating entity ID: %s -> %s", entity_entry.entity_id, new_entity_id
         )
         ent_reg.async_update_entity(
             entity_entry.entity_id, new_entity_id=new_entity_id
         )
+        migrated += 1
+
+    _LOGGER.warning(
+        "BuzzBridge entity migration complete: %d migrated, %d already correct",
+        migrated, skipped,
+    )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> bool:
