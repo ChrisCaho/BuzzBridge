@@ -290,6 +290,10 @@ async def async_setup_entry(
         else:
             base_name = f"{parent_name} {sensor_name}"
         remote_device_name = f"{prefix} {base_name}" if prefix else base_name
+        _LOGGER.warning(
+            "BuzzBridge remote sensor device: prefix=%r, base=%r, final=%r",
+            prefix, base_name, remote_device_name,
+        )
 
         device_info = DeviceInfo(
             identifiers={(DOMAIN, f"sensor_{sensor_id}")},
