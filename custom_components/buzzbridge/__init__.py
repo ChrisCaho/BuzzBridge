@@ -90,20 +90,8 @@ def _migrate_device_names(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> 
     dev_reg = dr.async_get(hass)
     devices = dr.async_entries_for_config_entry(dev_reg, entry.entry_id)
 
-    _LOGGER.warning(
-        "BuzzBridge device migration: %d devices, %d expected names: %r",
-        len(devices), len(expected_names), list(expected_names.keys())[:5],
-    )
-
     migrated = 0
     for device in devices:
-        idents = list(device.identifiers)
-        if device.name_by_user:
-            _LOGGER.warning(
-                "  Device %r has name_by_user=%r, skipping", device.name, device.name_by_user
-            )
-            continue
-
         # Find the expected name from our map
         expected = None
         for ident_domain, ident_id in device.identifiers:
@@ -112,26 +100,31 @@ def _migrate_device_names(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> 
                 break
 
         if expected is None:
-            _LOGGER.warning(
-                "  Device %r idents=%r: no match in expected_names",
-                device.name, idents,
-            )
             continue
 
-        if device.name == expected:
-            continue  # Already correct
+        # Clear name_by_user if it was set to an old name without the prefix.
+        # This happens when HA cached device names from before the prefix
+        # was added. name_by_user overrides the integration-provided name,
+        # so we need to clear it for the correct name to show.
+        if device.name_by_user and not device.name_by_user.startswith(f"{prefix} "):
+            _LOGGER.warning(
+                "Clearing stale name_by_user %r for device %r (integration name: %r)",
+                device.name_by_user, device.name, expected,
+            )
+            dev_reg.async_update_device(device.id, name_by_user=None)
+            migrated += 1
+        elif device.name != expected and not device.name_by_user:
+            _LOGGER.warning(
+                "Fixing device name: %r -> %r", device.name, expected
+            )
+            dev_reg.async_update_device(device.id, name=expected)
+            migrated += 1
 
+    if migrated:
         _LOGGER.warning(
-            "Fixing device name: %r -> %r (idents=%r)",
-            device.name, expected, idents,
+            "BuzzBridge device migration: %d of %d devices fixed",
+            migrated, len(devices),
         )
-        dev_reg.async_update_device(device.id, name=expected)
-        migrated += 1
-
-    _LOGGER.warning(
-        "BuzzBridge device name check: %d of %d devices updated",
-        migrated, len(devices),
-    )
 
 
 def _migrate_entity_ids(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> None:
