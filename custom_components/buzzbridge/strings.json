@@ -1,0 +1,41 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Beestat",
+        "description": "Enter your Beestat API key. You can find it at https://app.beestat.io → Menu → API Key.",
+        "data": {
+          "api_key": "API Key"
+        },
+        "data_description": {
+          "api_key": "Your 40-character Beestat API key"
+        }
+      }
+    },
+    "error": {
+      "invalid_api_key_format": "Invalid API key format. Must be 40 hex characters.",
+      "invalid_auth": "Invalid API key or session expired. Please check your key.",
+      "cannot_connect": "Cannot connect to the Beestat API. Please try again later.",
+      "unknown": "An unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This Beestat account is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "BuzzBridge Settings",
+        "description": "Configure polling intervals. Lower values give faster updates but use more API calls (limit: ~30/min).",
+        "data": {
+          "fast_poll_interval": "Fast poll interval (minutes)",
+          "slow_poll_interval": "Slow poll interval (minutes)"
+        },
+        "data_description": {
+          "fast_poll_interval": "Thermostat state, sensors, air quality (3-60 min, default 5)",
+          "slow_poll_interval": "Runtime summaries, settings (3-60 min, default 30)"
+        }
+      }
+    }
+  }
+}

@@ -1,32 +1,66 @@
 # BuzzBridge - Development Notes
-# Rev: 1.0
+# Rev: 2.0
 
 ## Project Overview
 Custom Home Assistant integration that pulls ecobee thermostat data from the Beestat API
 and exposes it as HA sensors. Bridges the gap left by ecobee closing their developer API.
 
 ## Architecture
-- Polls Beestat API every 3-5 minutes
-- Creates HA sensor entities via native HA integration (config flow)
-- No MQTT dependency required
+- Two DataUpdateCoordinators: Fast (5 min) and Slow (30 min)
+- All API calls use batch requests (multiple calls per HTTP request)
+- BeestatApi client handles auth, errors, rate limits
+- Config flow for API key entry, options flow for poll intervals
+- Platforms: sensor, binary_sensor, button
 
 ## Beestat API Details
 - Base URL: https://api.beestat.io/
 - Auth: API key as query parameter `?api_key={KEY}`
-- Rate limit: ~30 requests/minute
+- Rate limit: ~30 requests/minute (batch counts as 1)
+- See API_REFERENCE.md for complete endpoint documentation
 - Key endpoints:
-  - `thermostat.read` - thermostat data, running_equipment, hold status
-  - `runtime_sensor.read` - sensor data, air quality
-  - `thermostat.sync` - force fresh sync from ecobee
-  - `sensor.sync` - force sensor data sync
-- Data syncs when beestat is actively used in browser, and periodically otherwise
+  - `thermostat.read_id` - thermostat data, running_equipment, alerts
+  - `ecobee_thermostat.read_id` - raw ecobee data (events, settings, runtime, weather)
+  - `sensor.read_id` - sensor list with capabilities
+  - `runtime_thermostat_summary.read_id` - daily aggregated runtime summaries
+  - `thermostat.sync` / `sensor.sync` / `runtime.sync` - force sync from ecobee
+- Batch API: multiple calls in single HTTP request via `batch` param
+- Server-side caching: sync=180s, runtime reads=900s
 
-## Target Sensors
-- Hold status (type, duration, end time)
-- Running equipment (stage 1/2, aux, fan, humidifier, dehumidifier)
-- Air quality (if Premium ecobee)
-- Runtime data (daily, monthly, yearly)
-- Equipment stage details
+## Security
+- API key entered via config flow UI prompt during installation
+- Stored in HA .storage (encrypted config entries)
+- Validated as 40-char hex string before API call
+- Uses HA's shared aiohttp session (not custom sessions)
+- Auth failures raise ConfigEntryAuthFailed (disables entry, prompts re-auth)
+
+## File Structure
+```
+custom_components/buzzbridge/
+  __init__.py      - Integration setup, coordinators, options listener
+  api.py           - BeestatApi async HTTP client with batch support
+  config_flow.py   - Config flow (API key) + Options flow (poll intervals)
+  coordinator.py   - FastPollCoordinator + SlowPollCoordinator + boost mode
+  sensor.py        - All sensor entities (thermostat, AQ, runtime, remote)
+  binary_sensor.py - Occupancy + online status
+  button.py        - Boost polling button
+  air_quality.py   - AQ threshold lookups (CO2, VOC, score, accuracy)
+  calculations.py  - Calculated sensor functions (efficiency, comfort, etc.)
+  const.py         - All constants, thresholds, equipment maps
+  manifest.json    - HA integration manifest
+  strings.json     - UI strings for config/options flows
+  translations/en.json - English translations
+```
+
+## Code Review Notes
+- api.py: Batch call definitions are module-level constants (not rebuilt per poll)
+- api.py: Catches TimeoutError, 429 rate limits, validates response is dict
+- coordinator.py: Uses dt_util.utcnow() for boost timer (not naive datetime)
+- coordinator.py: is_boosted is a pure property (no side effects)
+- coordinator.py: Device discovery uses None sentinel (not empty set)
+- config_flow.py: Uses HA's shared session, SHA256 hash for unique ID
+- calculations.py: Uses explicit None checks (not falsy `not x` which breaks on 0)
 
 ## Progress Log
-- 2026-03-06: Project initialized, git repo created, connected to GitHub ChrisCaho/BuzzBridge
+- 2026-03-06: Project initialized, git repo created, connected to GitHub
+- 2026-03-06: Comprehensive API research completed - see API_REFERENCE.md
+- 2026-03-06: v1.0 build complete — all files written and code reviewed
