@@ -1,5 +1,5 @@
 # BuzzBridge - Sensor Platform
-# Rev: 1.1
+# Rev: 1.2
 #
 # Creates sensor entities for each thermostat and remote sensor discovered
 # via the Beestat API. Entity types include:
@@ -40,7 +40,7 @@ from homeassistant.const import (
     UnitOfTime,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.util import dt as dt_util
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -76,6 +76,9 @@ from .coordinator import FastPollCoordinator, SlowPollCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+# Coordinator-based platform: no parallel update limit needed
+PARALLEL_UPDATES = 0
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -109,7 +112,7 @@ async def async_setup_entry(
             name=tstat_name,
             manufacturer=MANUFACTURER,
             model=model_name,
-            sw_version=ecobee_data.get("settings", {}).get("firmwareVersion"),
+            sw_version=(ecobee_data.get("settings") or {}).get("firmwareVersion"),
         )
 
         # === Core thermostat sensors (fast poll) ===
@@ -175,7 +178,7 @@ async def async_setup_entry(
         )
 
         # === Air quality (Premium models only — uses -5002 to indicate N/A) ===
-        runtime = ecobee_data.get("runtime", {})
+        runtime = ecobee_data.get("runtime") or {}
         has_aq = BeestatApi.is_value_available(runtime.get("actualAQScore"))
 
         if has_aq:
@@ -334,6 +337,8 @@ async def async_setup_entry(
 class BuzzBridgeThermostatSensor(CoordinatorEntity, SensorEntity):
     """Sensor that reads a top-level key from thermostat data."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: FastPollCoordinator,
@@ -347,17 +352,19 @@ class BuzzBridgeThermostatSensor(CoordinatorEntity, SensorEntity):
         unit: str | None = None,
         state_class: SensorStateClass | None = None,
         icon: str | None = None,
+        entity_category: EntityCategory | None = None,
     ) -> None:
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
         self._key = key
-        self._attr_name = f"{tstat_name} {name}"
+        self._attr_name = name
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_{key}"
         self._attr_device_info = device_info
         self._attr_device_class = device_class
         self._attr_native_unit_of_measurement = unit
         self._attr_state_class = state_class
         self._attr_icon = icon
+        self._attr_entity_category = entity_category
 
     @property
     def native_value(self) -> Any:
@@ -370,6 +377,8 @@ class BuzzBridgeThermostatSensor(CoordinatorEntity, SensorEntity):
 
 class BuzzBridgeEcobeeSensor(CoordinatorEntity, SensorEntity):
     """Sensor that reads a nested key path from ecobee thermostat data."""
+
+    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -387,20 +396,17 @@ class BuzzBridgeEcobeeSensor(CoordinatorEntity, SensorEntity):
         self._tstat_id = str(tstat_id)
         self._ecobee_id = ecobee_id
         self._key_path = key_path
-        self._attr_name = f"{tstat_name} {name}"
+        self._attr_name = name
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_{'_'.join(str(k) for k in key_path)}"
         self._attr_device_info = device_info
         self._attr_icon = icon
 
     def _get_ecobee_data(self) -> dict[str, Any]:
-        """Get the ecobee thermostat data dict."""
+        """Get the ecobee thermostat data dict. Safe if any key is null."""
         if self.coordinator.data is None:
             return {}
-        return (
-            self.coordinator.data
-            .get(DATA_ECOBEE_THERMOSTATS, {})
-            .get(self._ecobee_id, {})
-        )
+        ecobee_all = self.coordinator.data.get(DATA_ECOBEE_THERMOSTATS) or {}
+        return ecobee_all.get(self._ecobee_id) or {}
 
     @property
     def native_value(self) -> Any:
@@ -421,6 +427,8 @@ class BuzzBridgeEcobeeSensor(CoordinatorEntity, SensorEntity):
 class BuzzBridgeRunningEquipmentSensor(CoordinatorEntity, SensorEntity):
     """Shows currently running equipment in human-readable form."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: FastPollCoordinator,
@@ -432,7 +440,7 @@ class BuzzBridgeRunningEquipmentSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
         self._ecobee_id = ecobee_id
-        self._attr_name = f"{tstat_name} Running Equipment"
+        self._attr_name = "Running Equipment"
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_running_equipment"
         self._attr_device_info = device_info
         self._attr_icon = "mdi:hvac"
@@ -443,7 +451,7 @@ class BuzzBridgeRunningEquipmentSensor(CoordinatorEntity, SensorEntity):
         if self.coordinator.data is None:
             return "Unknown"
         tstat = self.coordinator.data.get(DATA_THERMOSTATS, {}).get(self._tstat_id, {})
-        equipment = tstat.get("running_equipment", [])
+        equipment = tstat.get("running_equipment") or []
         if isinstance(equipment, str):
             equipment = [e.strip() for e in equipment.split(",") if e.strip()]
         return format_running_equipment(equipment)
@@ -451,6 +459,8 @@ class BuzzBridgeRunningEquipmentSensor(CoordinatorEntity, SensorEntity):
 
 class BuzzBridgeHoldSensor(CoordinatorEntity, SensorEntity):
     """Shows the current hold status with details as attributes."""
+
+    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -463,7 +473,7 @@ class BuzzBridgeHoldSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
         self._ecobee_id = ecobee_id
-        self._attr_name = f"{tstat_name} Hold Status"
+        self._attr_name = "Hold Status"
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_hold_status"
         self._attr_device_info = device_info
         self._attr_icon = "mdi:hand-back-left"
@@ -472,12 +482,9 @@ class BuzzBridgeHoldSensor(CoordinatorEntity, SensorEntity):
         """Find the first running hold event."""
         if self.coordinator.data is None:
             return None
-        ecobee = (
-            self.coordinator.data
-            .get(DATA_ECOBEE_THERMOSTATS, {})
-            .get(self._ecobee_id, {})
-        )
-        for event in ecobee.get("events", []):
+        ecobee_all = self.coordinator.data.get(DATA_ECOBEE_THERMOSTATS) or {}
+        ecobee = ecobee_all.get(self._ecobee_id) or {}
+        for event in (ecobee.get("events") or []):
             if event.get("type") == "hold" and event.get("running"):
                 return event
         return None
@@ -529,6 +536,8 @@ class BuzzBridgeAirQualitySensor(CoordinatorEntity, SensorEntity):
     CO2 is in ppm, VOC in ppb.
     """
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: FastPollCoordinator,
@@ -548,7 +557,7 @@ class BuzzBridgeAirQualitySensor(CoordinatorEntity, SensorEntity):
         self._ecobee_id = ecobee_id
         self._aq_key = aq_key
         self._aq_type = aq_type
-        self._attr_name = f"{tstat_name} {name}"
+        self._attr_name = name
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_{aq_key}"
         self._attr_device_info = device_info
         self._attr_native_unit_of_measurement = unit
@@ -557,14 +566,12 @@ class BuzzBridgeAirQualitySensor(CoordinatorEntity, SensorEntity):
             self._attr_state_class = SensorStateClass.MEASUREMENT
 
     def _get_runtime(self) -> dict[str, Any]:
-        """Get the ecobee runtime dict."""
+        """Get the ecobee runtime dict. Safe if any key is null."""
         if self.coordinator.data is None:
             return {}
-        return (
-            self.coordinator.data
-            .get(DATA_ECOBEE_THERMOSTATS, {})
-            .get(self._ecobee_id, {})
-            .get("runtime", {})
+        ecobee_all = self.coordinator.data.get(DATA_ECOBEE_THERMOSTATS) or {}
+        ecobee = ecobee_all.get(self._ecobee_id) or {}
+        return ecobee.get("runtime") or {}
         )
 
     @property
@@ -615,6 +622,9 @@ class BuzzBridgeAirQualitySensor(CoordinatorEntity, SensorEntity):
 class BuzzBridgeFilterSensor(CoordinatorEntity, SensorEntity):
     """Filter runtime and estimated days remaining."""
 
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
     def __init__(
         self,
         coordinator: FastPollCoordinator,
@@ -624,7 +634,7 @@ class BuzzBridgeFilterSensor(CoordinatorEntity, SensorEntity):
     ) -> None:
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
-        self._attr_name = f"{tstat_name} Filter Runtime"
+        self._attr_name = "Filter Runtime"
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_filter_runtime"
         self._attr_device_info = device_info
         self._attr_icon = "mdi:air-filter"
@@ -688,6 +698,8 @@ class BuzzBridgeWeatherSensor(BuzzBridgeEcobeeSensor):
 class BuzzBridgeRuntimeSensor(CoordinatorEntity, SensorEntity):
     """Daily equipment runtime from the slow-poll runtime summary."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: SlowPollCoordinator,
@@ -702,7 +714,7 @@ class BuzzBridgeRuntimeSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
         self._runtime_key = runtime_key
-        self._attr_name = f"{tstat_name} {name}"
+        self._attr_name = name
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_{runtime_key}"
         self._attr_device_info = device_info
         self._attr_icon = icon
@@ -752,6 +764,8 @@ class BuzzBridgeDegreeDaySensor(CoordinatorEntity, SensorEntity):
     If 80°F → 15 Cooling Degree Days. Higher = more energy needed.
     """
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: SlowPollCoordinator,
@@ -766,7 +780,7 @@ class BuzzBridgeDegreeDaySensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
         self._key = key
-        self._attr_name = f"{tstat_name} {name}"
+        self._attr_name = name
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_{key}"
         self._attr_device_info = device_info
         self._attr_icon = icon
@@ -801,6 +815,8 @@ class BuzzBridgeDegreeDaySensor(CoordinatorEntity, SensorEntity):
 class BuzzBridgeComfortSensor(CoordinatorEntity, SensorEntity):
     """Comfort index: 0-100 based on temperature accuracy and humidity."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: FastPollCoordinator,
@@ -810,7 +826,7 @@ class BuzzBridgeComfortSensor(CoordinatorEntity, SensorEntity):
     ) -> None:
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
-        self._attr_name = f"{tstat_name} Comfort Index"
+        self._attr_name = "Comfort Index"
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_comfort_index"
         self._attr_device_info = device_info
         self._attr_icon = "mdi:emoticon-happy-outline"
@@ -833,6 +849,8 @@ class BuzzBridgeComfortSensor(CoordinatorEntity, SensorEntity):
 class BuzzBridgeDifferentialSensor(CoordinatorEntity, SensorEntity):
     """Indoor vs outdoor temperature differential."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: FastPollCoordinator,
@@ -844,7 +862,7 @@ class BuzzBridgeDifferentialSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
         self._ecobee_id = ecobee_id
-        self._attr_name = f"{tstat_name} Indoor/Outdoor Differential"
+        self._attr_name = "Indoor/Outdoor Differential"
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_temp_differential"
         self._attr_device_info = device_info
         self._attr_icon = "mdi:thermometer-lines"
@@ -860,19 +878,20 @@ class BuzzBridgeDifferentialSensor(CoordinatorEntity, SensorEntity):
         tstat = self.coordinator.data.get(DATA_THERMOSTATS, {}).get(self._tstat_id, {})
         indoor = tstat.get("temperature")
 
-        ecobee = (
-            self.coordinator.data
-            .get(DATA_ECOBEE_THERMOSTATS, {})
-            .get(self._ecobee_id, {})
-        )
-        forecasts = ecobee.get("weather", {}).get("forecasts", [])
-        outdoor = forecasts[0].get("temperature") if forecasts else None
+        ecobee_all = self.coordinator.data.get(DATA_ECOBEE_THERMOSTATS) or {}
+        ecobee = ecobee_all.get(self._ecobee_id) or {}
+        weather = ecobee.get("weather") or {}
+        forecasts = weather.get("forecasts") or []
+        first = forecasts[0] if forecasts else None
+        outdoor = first.get("temperature") if isinstance(first, dict) else None
 
         return indoor_outdoor_differential(indoor, outdoor)
 
 
 class BuzzBridgeRemoteSensorEntity(CoordinatorEntity, SensorEntity):
     """Sensor entity for a remote sensor (temperature, humidity)."""
+
+    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -892,7 +911,7 @@ class BuzzBridgeRemoteSensorEntity(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._sensor_id = str(sensor_id)
         self._value_key = value_key
-        self._attr_name = f"{parent_name} {sensor_name} {name}"
+        self._attr_name = name
         self._attr_unique_id = f"{DOMAIN}_sensor_{sensor_id}_{value_key}"
         self._attr_device_info = device_info
         self._attr_device_class = device_class

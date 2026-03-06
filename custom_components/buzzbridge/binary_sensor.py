@@ -1,5 +1,5 @@
 # BuzzBridge - Binary Sensor Platform
-# Rev: 1.1
+# Rev: 1.2
 #
 # Binary sensors for:
 #   - Remote sensor occupancy (motion detection via ecobee sensors)
@@ -15,6 +15,7 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -31,6 +32,8 @@ from .const import (
 from .coordinator import FastPollCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
@@ -81,7 +84,7 @@ async def async_setup_entry(
         # Only add occupancy if the sensor has it
         has_occupancy = any(
             cap.get("type") == "occupancy"
-            for cap in sensor_data.get("capability", [])
+            for cap in (sensor_data.get("capability") or [])
         )
         if not has_occupancy:
             continue
@@ -111,7 +114,9 @@ async def async_setup_entry(
 class BuzzBridgeOnlineSensor(CoordinatorEntity, BinarySensorEntity):
     """Thermostat connectivity status."""
 
+    _attr_has_entity_name = True
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(
         self,
@@ -124,7 +129,7 @@ class BuzzBridgeOnlineSensor(CoordinatorEntity, BinarySensorEntity):
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
         self._ecobee_id = ecobee_id
-        self._attr_name = f"{tstat_name} Online"
+        self._attr_name = "Online"
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_online"
         self._attr_device_info = device_info
 
@@ -133,12 +138,9 @@ class BuzzBridgeOnlineSensor(CoordinatorEntity, BinarySensorEntity):
         """Return True if thermostat is connected."""
         if self.coordinator.data is None:
             return None
-        ecobee = (
-            self.coordinator.data
-            .get(DATA_ECOBEE_THERMOSTATS, {})
-            .get(self._ecobee_id, {})
-        )
-        connected = ecobee.get("runtime", {}).get("connected")
+        ecobee_all = self.coordinator.data.get(DATA_ECOBEE_THERMOSTATS) or {}
+        ecobee = ecobee_all.get(self._ecobee_id) or {}
+        connected = (ecobee.get("runtime") or {}).get("connected")
         if isinstance(connected, bool):
             return connected
         if isinstance(connected, str):
@@ -149,6 +151,7 @@ class BuzzBridgeOnlineSensor(CoordinatorEntity, BinarySensorEntity):
 class BuzzBridgeOccupancySensor(CoordinatorEntity, BinarySensorEntity):
     """Remote sensor occupancy/motion detection."""
 
+    _attr_has_entity_name = True
     _attr_device_class = BinarySensorDeviceClass.OCCUPANCY
 
     def __init__(
@@ -161,7 +164,7 @@ class BuzzBridgeOccupancySensor(CoordinatorEntity, BinarySensorEntity):
     ) -> None:
         super().__init__(coordinator)
         self._sensor_id = str(sensor_id)
-        self._attr_name = f"{parent_name} {sensor_name} Occupancy"
+        self._attr_name = "Occupancy"
         self._attr_unique_id = f"{DOMAIN}_sensor_{sensor_id}_occupancy"
         self._attr_device_info = device_info
 

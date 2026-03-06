@@ -1,5 +1,5 @@
 # BuzzBridge - Development Notes
-# Rev: 2.0
+# Rev: 3.0
 
 ## Project Overview
 Custom Home Assistant integration that pulls ecobee thermostat data from the Beestat API
@@ -10,7 +10,9 @@ and exposes it as HA sensors. Bridges the gap left by ecobee closing their devel
 - All API calls use batch requests (multiple calls per HTTP request)
 - BeestatApi client handles auth, errors, rate limits
 - Config flow for API key entry, options flow for poll intervals
-- Platforms: sensor, binary_sensor, button
+- Platforms: sensor, binary_sensor, button, diagnostics
+- Reauth flow for expired API keys
+- Device cleanup (async_remove_config_entry_device) prevents removing active devices
 
 ## Beestat API Details
 - Base URL: https://api.beestat.io/
@@ -48,6 +50,7 @@ custom_components/buzzbridge/
   const.py         - All constants, thresholds, equipment maps
   manifest.json    - HA integration manifest
   strings.json     - UI strings for config/options flows
+  diagnostics.py   - Diagnostic data export with sensitive field redaction
   translations/en.json - English translations
 ```
 
@@ -59,8 +62,24 @@ custom_components/buzzbridge/
 - coordinator.py: Device discovery uses None sentinel (not empty set)
 - config_flow.py: Uses HA's shared session, SHA256 hash for unique ID
 - calculations.py: Uses explicit None checks (not falsy `not x` which breaks on 0)
+- All platforms: PARALLEL_UPDATES = 0, _attr_has_entity_name = True
+- binary_sensor.py: EntityCategory.DIAGNOSTIC on online sensor
+- sensor.py: EntityCategory.DIAGNOSTIC on filter sensor
+- diagnostics.py: Redacts API keys, tokens, addresses, serial numbers, MAC addresses
+- config_flow.py: Reauth flow (async_step_reauth → reauth_confirm)
+- __init__.py: async_remove_config_entry_device blocks removal of active devices
+
+## HA Quality Scale Compliance
+- **has_entity_name**: All entity classes use `_attr_has_entity_name = True`
+- **entity_category**: Diagnostic entities marked with `EntityCategory.DIAGNOSTIC`
+- **PARALLEL_UPDATES**: Set to 0 on all coordinator-based platforms
+- **Diagnostics**: Full coordinator data export with `async_redact_data`
+- **Reauthentication**: `ConfigEntryAuthFailed` triggers reauth flow in UI
+- **Device cleanup**: `async_remove_config_entry_device` prevents removing active devices
 
 ## Progress Log
 - 2026-03-06: Project initialized, git repo created, connected to GitHub
 - 2026-03-06: Comprehensive API research completed - see API_REFERENCE.md
 - 2026-03-06: v1.0 build complete — all files written and code reviewed
+- 2026-03-06: v1.1 — Null-safety fixes, resilience audit, INSTALL.md
+- 2026-03-06: v1.2 — HA quality scale upgrades (diagnostics, reauth, has_entity_name, device cleanup)

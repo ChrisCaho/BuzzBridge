@@ -1,5 +1,5 @@
 # BuzzBridge - Button Platform
-# Rev: 1.1
+# Rev: 1.2
 #
 # Provides a "Boost Polling" button entity per thermostat.
 # When pressed, switches fast polling to every 60 seconds for 60 minutes,
@@ -30,6 +30,8 @@ from .const import (
 from .coordinator import FastPollCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
@@ -79,6 +81,9 @@ class BuzzBridgeBoostButton(CoordinatorEntity, ButtonEntity):
     reverts. Pressing again while boosted resets the 60-minute timer.
     """
 
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:rocket-launch"
+
     def __init__(
         self,
         coordinator: FastPollCoordinator,
@@ -88,10 +93,9 @@ class BuzzBridgeBoostButton(CoordinatorEntity, ButtonEntity):
     ) -> None:
         super().__init__(coordinator)
         self._tstat_id = str(tstat_id)
-        self._attr_name = f"{tstat_name} Boost Polling"
+        self._attr_name = "Boost Polling"
         self._attr_unique_id = f"{DOMAIN}_{tstat_id}_boost_polling"
         self._attr_device_info = device_info
-        self._attr_icon = "mdi:rocket-launch"
 
     async def async_press(self) -> None:
         """Activate boost mode."""

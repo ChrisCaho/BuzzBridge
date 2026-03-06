@@ -10,6 +10,16 @@
         "data_description": {
           "api_key": "Your 40-character Beestat API key"
         }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate BuzzBridge",
+        "description": "Your Beestat API key is no longer valid. Please enter a new one.",
+        "data": {
+          "api_key": "API Key"
+        },
+        "data_description": {
+          "api_key": "Your new 40-character Beestat API key"
+        }
       }
     },
     "error": {
@@ -19,7 +29,8 @@
       "unknown": "An unexpected error occurred."
     },
     "abort": {
-      "already_configured": "This Beestat account is already configured."
+      "already_configured": "This Beestat account is already configured.",
+      "reauth_successful": "Re-authentication successful."
     }
   },
   "options": {

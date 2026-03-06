@@ -1,5 +1,5 @@
 # BuzzBridge - Config Flow
-# Rev: 1.1
+# Rev: 1.2
 #
 # Handles the UI setup flow for BuzzBridge:
 #   1. User enters their Beestat API key (40-character hex string)
@@ -93,6 +93,55 @@ class BuzzBridgeConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="user",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_API_KEY): str,
+                }
+            ),
+            errors=errors,
+        )
+
+    async def async_step_reauth(
+        self, entry_data: dict[str, Any]
+    ) -> ConfigFlowResult:
+        """Handle reauthentication when the API key becomes invalid."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle reauth confirmation — prompt for new API key."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            api_key = user_input[CONF_API_KEY].strip().lower()
+
+            if len(api_key) != API_KEY_LENGTH or not all(
+                c in "0123456789abcdef" for c in api_key
+            ):
+                errors[CONF_API_KEY] = "invalid_api_key_format"
+            else:
+                try:
+                    session = async_get_clientsession(self.hass)
+                    api = BeestatApi(session, api_key)
+                    await api.validate_api_key()
+                except BeestatAuthError:
+                    errors[CONF_API_KEY] = "invalid_auth"
+                except BeestatApiError:
+                    errors["base"] = "cannot_connect"
+                except Exception:
+                    _LOGGER.exception("Unexpected error during reauth validation")
+                    errors["base"] = "unknown"
+
+            if not errors:
+                reauth_entry = self._get_reauth_entry()
+                return self.async_update_reload_and_abort(
+                    reauth_entry,
+                    data={**reauth_entry.data, CONF_API_KEY: api_key},
+                )
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_API_KEY): str,

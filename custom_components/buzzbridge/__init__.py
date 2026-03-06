@@ -1,5 +1,5 @@
 # BuzzBridge - Integration Setup
-# Rev: 1.1
+# Rev: 1.2
 #
 # Entry point for the BuzzBridge custom integration. Handles:
 #   - Creating the BeestatApi client with HA's shared aiohttp session
@@ -14,6 +14,7 @@ import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import BeestatApi
@@ -98,3 +99,49 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.info("BuzzBridge unloaded for entry %s", entry.entry_id)
 
     return unload_ok
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    device_entry: dr.DeviceEntry,
+) -> bool:
+    """Allow manual removal of BuzzBridge devices from the UI.
+
+    Only allows removal if the device is no longer present in coordinator data
+    (e.g., a thermostat was removed from the ecobee account or a remote sensor
+    was deleted). Active devices cannot be removed.
+    """
+    data = hass.data[DOMAIN].get(entry.entry_id)
+    if not data:
+        return True  # Integration data gone, allow removal
+
+    fast_coord = data.get("fast_coordinator")
+    if fast_coord is None or fast_coord.data is None:
+        return True  # No data to check against, allow removal
+
+    # Check if any device identifier is still present in coordinator data
+    for identifier in device_entry.identifiers:
+        if identifier[0] != DOMAIN:
+            continue
+        device_id = identifier[1]
+
+        # Check thermostats (identifier = tstat_id)
+        if device_id in (fast_coord.data.get("thermostats") or {}):
+            _LOGGER.warning(
+                "Cannot remove device %s — thermostat still active", device_id
+            )
+            return False
+
+        # Check remote sensors (identifier = "sensor_{sensor_id}")
+        if device_id.startswith("sensor_"):
+            sensor_id = device_id[7:]  # Strip "sensor_" prefix
+            sensors = fast_coord.data.get("sensors") or {}
+            sensor = sensors.get(sensor_id, {})
+            if sensor and not sensor.get("deleted") and not sensor.get("inactive"):
+                _LOGGER.warning(
+                    "Cannot remove device %s — sensor still active", device_id
+                )
+                return False
+
+    return True
