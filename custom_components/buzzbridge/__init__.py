@@ -90,10 +90,19 @@ def _migrate_device_names(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> 
     dev_reg = dr.async_get(hass)
     devices = dr.async_entries_for_config_entry(dev_reg, entry.entry_id)
 
+    _LOGGER.warning(
+        "BuzzBridge device migration: %d devices, %d expected names: %r",
+        len(devices), len(expected_names), list(expected_names.keys())[:5],
+    )
+
     migrated = 0
     for device in devices:
+        idents = list(device.identifiers)
         if device.name_by_user:
-            continue  # Respect user customizations
+            _LOGGER.warning(
+                "  Device %r has name_by_user=%r, skipping", device.name, device.name_by_user
+            )
+            continue
 
         # Find the expected name from our map
         expected = None
@@ -102,12 +111,22 @@ def _migrate_device_names(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> 
                 expected = expected_names[ident_id]
                 break
 
-        if expected and device.name != expected:
+        if expected is None:
             _LOGGER.warning(
-                "Fixing device name: %r -> %r", device.name, expected
+                "  Device %r idents=%r: no match in expected_names",
+                device.name, idents,
             )
-            dev_reg.async_update_device(device.id, name=expected)
-            migrated += 1
+            continue
+
+        if device.name == expected:
+            continue  # Already correct
+
+        _LOGGER.warning(
+            "Fixing device name: %r -> %r (idents=%r)",
+            device.name, expected, idents,
+        )
+        dev_reg.async_update_device(device.id, name=expected)
+        migrated += 1
 
     _LOGGER.warning(
         "BuzzBridge device name check: %d of %d devices updated",
