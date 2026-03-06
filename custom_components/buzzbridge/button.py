@@ -1,5 +1,5 @@
 # BuzzBridge - Button Platform
-# Rev: 1.3
+# Rev: 1.4
 #
 # Provides a "Boost Polling" button entity per thermostat.
 # When pressed, switches fast polling to every 60 seconds for 60 minutes,
@@ -60,7 +60,7 @@ async def async_setup_entry(
 
         device_info = DeviceInfo(
             identifiers={(DOMAIN, str(tstat_id))},
-            name=tstat_name,
+            name=f"BuzzBridge {tstat_name}",
             manufacturer=MANUFACTURER,
             model=model_name,
         )

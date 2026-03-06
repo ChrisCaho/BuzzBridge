@@ -1,5 +1,5 @@
 # BuzzBridge - Binary Sensor Platform
-# Rev: 1.3
+# Rev: 1.4
 #
 # Binary sensors for:
 #   - Remote sensor occupancy (motion detection via ecobee sensors)
@@ -63,7 +63,7 @@ async def async_setup_entry(
 
         device_info = DeviceInfo(
             identifiers={(DOMAIN, str(tstat_id))},
-            name=tstat_name,
+            name=f"BuzzBridge {tstat_name}",
             manufacturer=MANUFACTURER,
             model=model_name,
         )
@@ -93,9 +93,15 @@ async def async_setup_entry(
         parent_tstat = thermostats.get(parent_tstat_id, {})
         parent_name = parent_tstat.get("name", "Unknown")
 
+        # Avoid "Studio Studio" when sensor name matches parent thermostat name
+        if sensor_name.lower() == parent_name.lower():
+            remote_device_name = f"BuzzBridge {sensor_name} Sensor"
+        else:
+            remote_device_name = f"BuzzBridge {parent_name} {sensor_name}"
+
         device_info = DeviceInfo(
             identifiers={(DOMAIN, f"sensor_{sensor_id}")},
-            name=f"{parent_name} {sensor_name}",
+            name=remote_device_name,
             manufacturer=MANUFACTURER,
             model=sensor_data.get("type", "").replace("_", " ").title(),
             via_device=(DOMAIN, parent_tstat_id),
