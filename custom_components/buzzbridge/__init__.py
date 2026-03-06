@@ -37,6 +37,40 @@ from .entity import BuzzBridgeConfigEntry, BuzzBridgeData, get_device_prefix
 _LOGGER = logging.getLogger(__name__)
 
 
+def _migrate_device_names(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> None:
+    """Ensure all device names include the configured prefix.
+
+    HA's device registry may cache old device names from before the prefix
+    was added. This updates any BuzzBridge device whose name doesn't start
+    with the prefix.
+    """
+    prefix = get_device_prefix(entry)
+    if not prefix:
+        return
+
+    dev_reg = dr.async_get(hass)
+    devices = dr.async_entries_for_config_entry(dev_reg, entry.entry_id)
+
+    migrated = 0
+    for device in devices:
+        # Skip devices where the user has set a custom name
+        if device.name_by_user:
+            continue
+        if device.name and device.name.startswith(f"{prefix} "):
+            continue  # Already has the prefix
+
+        if device.name:
+            new_name = f"{prefix} {device.name}"
+            _LOGGER.warning(
+                "Migrating device name: %r -> %r", device.name, new_name
+            )
+            dev_reg.async_update_device(device.id, name=new_name)
+            migrated += 1
+
+    if migrated:
+        _LOGGER.warning("BuzzBridge device migration: %d devices renamed", migrated)
+
+
 def _migrate_entity_ids(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> None:
     """Migrate entity IDs to include the device prefix if missing.
 
@@ -119,9 +153,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -
     # Set up all platforms (creates entities in the registry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Migrate entity IDs to include the prefix AFTER entities are created.
-    # This handles both upgrades from pre-v1.5 and fresh installs where HA
-    # may not include the device name prefix in auto-generated entity IDs.
+    # Migrate device names and entity IDs to include the prefix AFTER
+    # entities are created. This handles both upgrades from pre-v1.5 and
+    # fresh installs where HA may not include the prefix automatically.
+    _migrate_device_names(hass, entry)
     _migrate_entity_ids(hass, entry)
 
     # Listen for options changes (poll intervals)
