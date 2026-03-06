@@ -1,5 +1,5 @@
 # How to Install BuzzBridge
-# Rev: 1.0
+# Rev: 1.1
 
 This guide will walk you through setting up BuzzBridge step by step. No coding required!
 
@@ -63,7 +63,8 @@ If you have HACS (Home Assistant Community Store) installed:
 4. Search for **"BuzzBridge"**
 5. Click on it
 6. **Paste your API key** from Step 2
-7. Click **"Submit"**
+7. Optionally set a **device name prefix** (default: "BuzzBridge"). This prefix is added to all device and entity names so you can tell them apart from other integrations (e.g., "BuzzBridge Living Room"). Leave it blank if you don't want a prefix.
+8. Click **"Submit"**
 
 If everything works, you'll see a success message! BuzzBridge will automatically find all your thermostats and create sensors for them.
 
@@ -80,6 +81,7 @@ You should see things like:
 - Hold status
 - Air quality (if you have an ecobee Premium)
 - Daily runtimes
+- Remote sensor temperature, occupancy, and participating status
 - And more!
 
 ## Step 6: Adjust Settings (Optional)

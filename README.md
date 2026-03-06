@@ -71,8 +71,8 @@ Higher numbers = more energy needed. Useful for:
 
 ### Remote Sensors
 - **Temperature** — for every ecobee remote sensor
-- **Humidity** — where available (thermostat built-in sensor)
 - **Occupancy** — motion detection as binary sensor
+- **Participating** — whether the sensor is included in the thermostat's comfort average (diagnostic)
 
 ### Filter Status
 - **Filter Runtime** — total hours since last change
@@ -244,10 +244,17 @@ Remote sensors are automatically discovered and registered as child devices of t
 
 - **Online** (per thermostat) — connectivity status, diagnostic entity
 - **Occupancy** (per remote sensor) — motion detection
+- **Participating** (per remote sensor) — included in comfort average, diagnostic entity
 
 ### Button Entities
 
 - **Boost Polling** (per thermostat) — activates 1-minute polling for 60 minutes
+
+### Source Attribute
+
+Every BuzzBridge entity includes a `source` attribute indicating where its data comes from:
+- **`beestat`** — data read directly from the Beestat API (temperature, humidity, equipment, air quality, etc.)
+- **`calculated`** — derived from beestat data by BuzzBridge (comfort index, indoor/outdoor differential)
 
 ### Diagnostic Support
 
@@ -261,7 +268,7 @@ BuzzBridge supports the Home Assistant diagnostics platform. You can download a 
 - **Data is 3-5 minutes behind real-time** — Beestat applies server-side caching (3 min on sync, 15 min on runtime summaries). This is a Beestat platform constraint, not a BuzzBridge limitation.
 - **API rate limit of ~30 requests/minute** — Each batch request (fast poll or slow poll) counts as 1 request regardless of how many thermostats you have. Under normal operation with defaults, BuzzBridge uses approximately 1 request every 5 minutes plus 1 every 30 minutes.
 - **Air quality sensors require ecobee Premium** — Only the `aresSmart` model has the Bosch BME680 gas sensor. Other models will not expose CO2, VOC, AQ score, or accuracy entities.
-- **Remote sensors provide temperature and occupancy only** — Humidity is only available on the thermostat's built-in sensor. Remote sensors cannot be directly controlled.
+- **Remote sensors provide temperature, occupancy, and participating status only** — Humidity is only available on the thermostat entity itself. Remote sensors cannot be directly controlled.
 - **Beestat account required** — A free [Beestat](https://beestat.io/) account linked to your ecobee is required. BuzzBridge does not communicate directly with ecobee.
 - **ecobee developer API closed** — ecobee closed its developer API to new registrations in March 2024. Beestat is grandfathered in. This is why BuzzBridge exists.
 - **Weather sensors are basic** — Weather data comes from ecobee's built-in weather feed, which provides temperature and humidity only. For richer weather data, use a dedicated weather integration.
