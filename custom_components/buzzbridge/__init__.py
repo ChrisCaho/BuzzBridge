@@ -98,9 +98,6 @@ def _migrate_entity_ids(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> No
 
 async def async_setup_entry(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> bool:
     """Set up BuzzBridge from a config entry."""
-    # Migrate legacy entity IDs to include the prefix before platform setup
-    _migrate_entity_ids(hass, entry)
-
     session = async_get_clientsession(hass)
     api = BeestatApi(session, entry.data[CONF_API_KEY])
 
@@ -119,8 +116,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -
     await fast_coordinator.async_config_entry_first_refresh()
     await slow_coordinator.async_config_entry_first_refresh()
 
-    # Set up all platforms
+    # Set up all platforms (creates entities in the registry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Migrate entity IDs to include the prefix AFTER entities are created.
+    # This handles both upgrades from pre-v1.5 and fresh installs where HA
+    # may not include the device name prefix in auto-generated entity IDs.
+    _migrate_entity_ids(hass, entry)
 
     # Listen for options changes (poll intervals)
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
