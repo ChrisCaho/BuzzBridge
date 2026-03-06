@@ -40,35 +40,79 @@ _LOGGER = logging.getLogger(__name__)
 def _migrate_device_names(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> None:
     """Ensure all device names include the configured prefix.
 
-    HA's device registry may cache old device names from before the prefix
-    was added. This updates any BuzzBridge device whose name doesn't start
-    with the prefix.
+    HA's device registry caches device names and does not update them from
+    DeviceInfo on subsequent loads. This explicitly updates any BuzzBridge
+    device whose name doesn't match the expected name with prefix.
+
+    Uses coordinator data to reconstruct the correct full device name
+    (including parent thermostat name for remote sensors).
     """
     prefix = get_device_prefix(entry)
     if not prefix:
         return
 
+    fast_coord = entry.runtime_data.fast_coordinator
+    if fast_coord.data is None:
+        return
+
+    thermostats = fast_coord.data.get(DATA_THERMOSTATS, {})
+    sensors = fast_coord.data.get(DATA_SENSORS, {})
+
+    # Build a map of device identifier -> expected name
+    expected_names: dict[str, str] = {}
+
+    # Thermostat devices: identifier = tstat_id
+    for tstat_id, tstat in thermostats.items():
+        tstat_name = tstat.get("name", f"Thermostat {tstat_id}")
+        expected_names[str(tstat_id)] = (
+            f"{prefix} {tstat_name}" if prefix else tstat_name
+        )
+
+    # Remote sensor devices: identifier = "sensor_{sensor_id}"
+    for sensor_id, sensor_data in sensors.items():
+        if sensor_data.get("deleted") or sensor_data.get("inactive"):
+            continue
+        sensor_name = sensor_data.get("name", f"Sensor {sensor_id}")
+        parent_tstat_id = str(sensor_data.get("thermostat_id", ""))
+        parent_tstat = thermostats.get(parent_tstat_id, {})
+        parent_name = parent_tstat.get("name", "Unknown")
+
+        if sensor_name.lower() == parent_name.lower():
+            base_name = f"{sensor_name} Sensor"
+        else:
+            base_name = f"{parent_name} {sensor_name}"
+
+        expected_names[f"sensor_{sensor_id}"] = (
+            f"{prefix} {base_name}" if prefix else base_name
+        )
+
+    # Now update any devices with wrong names
     dev_reg = dr.async_get(hass)
     devices = dr.async_entries_for_config_entry(dev_reg, entry.entry_id)
 
     migrated = 0
     for device in devices:
-        # Skip devices where the user has set a custom name
         if device.name_by_user:
-            continue
-        if device.name and device.name.startswith(f"{prefix} "):
-            continue  # Already has the prefix
+            continue  # Respect user customizations
 
-        if device.name:
-            new_name = f"{prefix} {device.name}"
+        # Find the expected name from our map
+        expected = None
+        for ident_domain, ident_id in device.identifiers:
+            if ident_domain == DOMAIN and ident_id in expected_names:
+                expected = expected_names[ident_id]
+                break
+
+        if expected and device.name != expected:
             _LOGGER.warning(
-                "Migrating device name: %r -> %r", device.name, new_name
+                "Fixing device name: %r -> %r", device.name, expected
             )
-            dev_reg.async_update_device(device.id, name=new_name)
+            dev_reg.async_update_device(device.id, name=expected)
             migrated += 1
 
-    if migrated:
-        _LOGGER.warning("BuzzBridge device migration: %d devices renamed", migrated)
+    _LOGGER.warning(
+        "BuzzBridge device name check: %d of %d devices updated",
+        migrated, len(devices),
+    )
 
 
 def _migrate_entity_ids(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> None:
