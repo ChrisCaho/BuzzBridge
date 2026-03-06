@@ -1,0 +1,7 @@
+{
+    "success": false,
+    "data": {
+        "error_message": "Method is not mapped.",
+        "error_code": 1504
+    }
+}

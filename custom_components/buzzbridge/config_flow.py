@@ -1,5 +1,5 @@
 # BuzzBridge - Config Flow
-# Rev: 1.3
+# Rev: 1.4
 #
 # Handles the UI setup flow for BuzzBridge:
 #   1. User enters their Beestat API key (40-character hex string)
@@ -28,8 +28,10 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import BeestatApi, BeestatApiError, BeestatAuthError
 from .const import (
     CONF_API_KEY,
+    CONF_DEVICE_PREFIX,
     CONF_FAST_POLL_INTERVAL,
     CONF_SLOW_POLL_INTERVAL,
+    DEFAULT_DEVICE_PREFIX,
     DEFAULT_FAST_POLL_MINUTES,
     DEFAULT_SLOW_POLL_MINUTES,
     DOMAIN,
@@ -55,6 +57,9 @@ class BuzzBridgeConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             api_key = user_input[CONF_API_KEY].strip().lower()
+            device_prefix = user_input.get(
+                CONF_DEVICE_PREFIX, DEFAULT_DEVICE_PREFIX
+            ).strip()
 
             # Basic format validation (40 hex characters)
             if len(api_key) != API_KEY_LENGTH or not all(
@@ -84,7 +89,10 @@ class BuzzBridgeConfigFlow(ConfigFlow, domain=DOMAIN):
 
                 return self.async_create_entry(
                     title="BuzzBridge",
-                    data={CONF_API_KEY: api_key},
+                    data={
+                        CONF_API_KEY: api_key,
+                        CONF_DEVICE_PREFIX: device_prefix,
+                    },
                     options={
                         CONF_FAST_POLL_INTERVAL: DEFAULT_FAST_POLL_MINUTES,
                         CONF_SLOW_POLL_INTERVAL: DEFAULT_SLOW_POLL_MINUTES,
@@ -96,6 +104,9 @@ class BuzzBridgeConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_API_KEY): str,
+                    vol.Optional(
+                        CONF_DEVICE_PREFIX, default=DEFAULT_DEVICE_PREFIX
+                    ): str,
                 }
             ),
             errors=errors,

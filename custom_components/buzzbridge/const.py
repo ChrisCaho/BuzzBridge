@@ -19,8 +19,11 @@ MANUFACTURER: Final = "ecobee (via Beestat)"
 # Configuration keys
 # =============================================================================
 CONF_API_KEY: Final = "api_key"
+CONF_DEVICE_PREFIX: Final = "device_prefix"
 CONF_FAST_POLL_INTERVAL: Final = "fast_poll_interval"
 CONF_SLOW_POLL_INTERVAL: Final = "slow_poll_interval"
+
+DEFAULT_DEVICE_PREFIX: Final = "BuzzBridge"
 
 # =============================================================================
 # Polling defaults and limits

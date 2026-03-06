@@ -72,7 +72,7 @@ from .const import (
     SECONDS_PER_HOUR,
 )
 from .coordinator import FastPollCoordinator, SlowPollCoordinator
-from .entity import BuzzBridgeConfigEntry
+from .entity import BuzzBridgeConfigEntry, get_device_prefix
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -88,6 +88,7 @@ async def async_setup_entry(
     """Set up BuzzBridge sensor entities."""
     fast_coord = entry.runtime_data.fast_coordinator
     slow_coord = entry.runtime_data.slow_coordinator
+    prefix = get_device_prefix(entry)
 
     entities: list[SensorEntity] = []
 
@@ -108,7 +109,7 @@ async def async_setup_entry(
 
         device_info = DeviceInfo(
             identifiers={(DOMAIN, str(tstat_id))},
-            name=f"BuzzBridge {tstat_name}",
+            name=f"{prefix} {tstat_name}" if prefix else tstat_name,
             manufacturer=MANUFACTURER,
             model=model_name,
             sw_version=(ecobee_data.get("settings") or {}).get("firmwareVersion"),
@@ -285,9 +286,10 @@ async def async_setup_entry(
 
         # Avoid "Studio Studio" when sensor name matches parent thermostat name
         if sensor_name.lower() == parent_name.lower():
-            remote_device_name = f"BuzzBridge {sensor_name} Sensor"
+            base_name = f"{sensor_name} Sensor"
         else:
-            remote_device_name = f"BuzzBridge {parent_name} {sensor_name}"
+            base_name = f"{parent_name} {sensor_name}"
+        remote_device_name = f"{prefix} {base_name}" if prefix else base_name
 
         device_info = DeviceInfo(
             identifiers={(DOMAIN, f"sensor_{sensor_id}")},

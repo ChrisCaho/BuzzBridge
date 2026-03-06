@@ -27,7 +27,7 @@ from .const import (
     MANUFACTURER,
 )
 from .coordinator import FastPollCoordinator
-from .entity import BuzzBridgeConfigEntry
+from .entity import BuzzBridgeConfigEntry, get_device_prefix
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,6 +41,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up BuzzBridge button entities."""
     fast_coord = entry.runtime_data.fast_coordinator
+    prefix = get_device_prefix(entry)
 
     entities: list[ButtonEntity] = []
 
@@ -60,7 +61,7 @@ async def async_setup_entry(
 
         device_info = DeviceInfo(
             identifiers={(DOMAIN, str(tstat_id))},
-            name=f"BuzzBridge {tstat_name}",
+            name=f"{prefix} {tstat_name}" if prefix else tstat_name,
             manufacturer=MANUFACTURER,
             model=model_name,
         )

@@ -5,10 +5,12 @@
         "title": "Connect to Beestat",
         "description": "Enter your Beestat API key. You can find it at https://app.beestat.io → Menu → API Key.",
         "data": {
-          "api_key": "API Key"
+          "api_key": "API Key",
+          "device_prefix": "Device name prefix"
         },
         "data_description": {
-          "api_key": "Your 40-character Beestat API key"
+          "api_key": "Your 40-character Beestat API key",
+          "device_prefix": "Prefix added to all device names (e.g. 'BuzzBridge Studio'). Leave empty for no prefix."
         }
       },
       "reauth_confirm": {

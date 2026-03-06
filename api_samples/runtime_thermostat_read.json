@@ -1,0 +1,7 @@
+{
+    "success": false,
+    "data": {
+        "error_message": "Undefined array key \"thermostat_id\"",
+        "error_code": 2
+    }
+}

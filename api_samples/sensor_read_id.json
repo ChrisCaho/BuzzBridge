@@ -1,0 +1,477 @@
+{
+    "success": true,
+    "data": {
+        "246727": {
+            "sensor_id": 246727,
+            "user_id": 55746,
+            "thermostat_id": 91140,
+            "ecobee_sensor_id": 243231,
+            "identifier": "rs:100",
+            "name": "Den",
+            "type": "ecobee3_remote_sensor",
+            "in_use": false,
+            "temperature": 72.6,
+            "humidity": null,
+            "occupancy": false,
+            "capability": [
+                {
+                    "id": "1",
+                    "type": "temperature",
+                    "value": "726"
+                },
+                {
+                    "id": "2",
+                    "type": "occupancy",
+                    "value": "false"
+                }
+            ],
+            "inactive": false,
+            "deleted": false
+        },
+        "246728": {
+            "sensor_id": 246728,
+            "user_id": 55746,
+            "thermostat_id": 91140,
+            "ecobee_sensor_id": 243232,
+            "identifier": "rs:101",
+            "name": "Office",
+            "type": "ecobee3_remote_sensor",
+            "in_use": true,
+            "temperature": 75.2,
+            "humidity": null,
+            "occupancy": false,
+            "capability": [
+                {
+                    "id": "1",
+                    "type": "temperature",
+                    "value": "752"
+                },
+                {
+                    "id": "2",
+                    "type": "occupancy",
+                    "value": "false"
+                }
+            ],
+            "inactive": false,
+            "deleted": false
+        },
+        "246729": {
+            "sensor_id": 246729,
+            "user_id": 55746,
+            "thermostat_id": 91140,
+            "ecobee_sensor_id": 243233,
+            "identifier": "rs:103",
+            "name": "Londons Rm",
+            "type": "ecobee3_remote_sensor",
+            "in_use": true,
+            "temperature": 72.9,
+            "humidity": null,
+            "occupancy": false,
+            "capability": [
+                {
+                    "id": "1",
+                    "type": "temperature",
+                    "value": "729"
+                },
+                {
+                    "id": "2",
+                    "type": "occupancy",
+                    "value": "false"
+                }
+            ],
+            "inactive": false,
+            "deleted": false
+        },
+        "246730": {
+            "sensor_id": 246730,
+            "user_id": 55746,
+            "thermostat_id": 91140,
+            "ecobee_sensor_id": 243234,
+            "identifier": "rs:104",
+            "name": "Garage",
+            "type": "ecobee3_remote_sensor",
+            "in_use": false,
+            "temperature": 77.1,
+            "humidity": null,
+            "occupancy": false,
+            "capability": [
+                {
+                    "id": "1",
+                    "type": "temperature",
+                    "value": "771"
+                },
+                {
+                    "id": "2",
+                    "type": "occupancy",
+                    "value": "false"
+                }
+            ],
+            "inactive": false,
+            "deleted": false
+        },
+        "246731": {
+            "sensor_id": 246731,
+            "user_id": 55746,
+            "thermostat_id": 91140,
+            "ecobee_sensor_id": 243235,
+            "identifier": "rs2:103",
+            "name": "Wine Room",
+            "type": "ecobee3_remote_sensor",
+            "in_use": true,
+            "temperature": 73.2,
+            "humidity": null,
+            "occupancy": false,
+            "capability": [
+                {
+                    "id": "1",
+                    "type": "temperature",
+                    "value": "732"
+                },
+                {
+                    "id": "2",
+                    "type": "occupancy",
+                    "value": "false"
+                }
+            ],
+            "inactive": false,
+            "deleted": false
+        },
+        "246732": {
+            "sensor_id": 246732,
+            "user_id": 55746,
+            "thermostat_id": 91140,
+            "ecobee_sensor_id": 243236,
+            "identifier": "ei:0",
+            "name": "Home",
+            "type": "thermostat",
+            "in_use": true,
+            "temperature": 73.6,
+            "humidity": 6,
+            "occupancy": false,
+            "capability": [
+                {
+                    "id": "1",
+                    "type": "temperature",
+                    "value": "736"
+                },
+                {
+                    "id": "2",
+                    "type": "humidity",
+                    "value": "57"
+                },
+                {
+                    "id": "3",
+                    "type": "occupancy",
+                    "value": "false"
+                }
+            ],
+            "inactive": false,
+            "deleted": false
+        },
+        "246733": {
+            "sensor_id": 246733,
+            "user_id": 55746,
+            "thermostat_id": 91140,
+            "ecobee_sensor_id": 243237,
+            "identifier": "rs2:102",
+            "name": "Guest Bedrm",
+            "type": "ecobee3_remote_sensor",
+            "in_use": false,
+            "temperature": 72.6,
+            "humidity": null,
+            "occupancy": false,
+            "capability": [
+                {
+                    "id": "1",
+                    "type": "temperature",
+                    "value": "726"
+                },
+                {
+                    "id": "2",
+                    "type": "occupancy",
+                    "value": "false"
+                }
+            ],
+            "inactive": false,
+            "deleted": false
+        },
+        "246734": {
+            "sensor_id": 246734,
+            "user_id": 55746,
+            "thermostat_id": 91140,
+            "ecobee_sensor_id": 243238,
+            "identifier": "rs2:101",
+            "name": "Kitchen",
+            "type": "ecobee3_remote_sensor",
+            "in_use": false,
+            "temperature": 76.5,
+            "humidity": null,
+            "occupancy": false,
+            "capability": [
+                {
+                    "id": "1",
+                    "type": "temperature",
+                    "value": "765"
+                },
+                {
+                    "id": "2",
+                    "type": "occupancy",
+                    "value": "false"
+                }
+            ],
+            "inactive": false,
+            "deleted": false
+        },
+        "246735": {
+            "sensor_id": 246735,
+            "user_id": 55746,
+            "thermostat_id": 91140,
+            "ecobee_sensor_id": 243239,
+            "identifier": "rs2:100",
+            "name": "Living Room",
+            "type": "ecobee3_remote_sensor",
+            "in_use": true,
+            "temperature": 73.5,
+            "humidity": null,
+            "occupancy": false,
+            "capability": [
+                {
+                    "id": "1",
+                    "type": "temperature",
+                    "value": "735"
+                },
+                {
+                    "id": "2",
+                    "type": "occupancy",
+                    "value": "false"
+                }
+            ],
+            "inactive": false,
+            "deleted": false
+        },
+        "246736": {
+            "sensor_id": 246736,
+            "user_id": 55746,
+            "thermostat_id": 91141,
+            "ecobee_sensor_id": 243240,
+            "identifier": "rs:100",
+            "name": "Master Bath",
+            "type": "ecobee3_remote_sensor",
+            "in_use": true,
+            "temperature": 71,
+            "humidity": null,
+            "occupancy": false,
+            "capability": [
+                {
+                    "id": "1",
+                    "type": "temperature",
+                    "value": "710"
+                },
+                {
+                    "id": "2",
+                    "type": "occupancy",
+                    "value": "false"
+                }
+            ],
+            "inactive": false,
+            "deleted": false
+        },
+        "246737": {
+            "sensor_id": 246737,
+            "user_id": 55746,
+            "thermostat_id": 91141,
+            "ecobee_sensor_id": 243241,
+            "identifier": "ei:0",
+            "name": "Master BedRm",
+            "type": "thermostat",
+            "in_use": false,
+            "temperature": 72.2,
+            "humidity": 6,
+            "occupancy": false,
+            "capability": [
+                {
+                    "id": "1",
+                    "type": "temperature",
+                    "value": "722"
+                },
+                {
+                    "id": "2",
+                    "type": "humidity",
+                    "value": "60"
+                },
+                {
+                    "id": "3",
+                    "type": "occupancy",
+                    "value": "false"
+                }
+            ],
+            "inactive": false,
+            "deleted": false
+        },
+        "246738": {
+            "sensor_id": 246738,
+            "user_id": 55746,
+            "thermostat_id": 91141,
+            "ecobee_sensor_id": 243242,
+            "identifier": "rs2:101",
+            "name": "Night Stand Right",
+            "type": "ecobee3_remote_sensor",
+            "in_use": true,
+            "temperature": 71.7,
+            "humidity": null,
+            "occupancy": false,
+            "capability": [
+                {
+                    "id": "1",
+                    "type": "temperature",
+                    "value": "717"
+                },
+                {
+                    "id": "2",
+                    "type": "occupancy",
+                    "value": "false"
+                }
+            ],
+            "inactive": false,
+            "deleted": false
+        },
+        "246739": {
+            "sensor_id": 246739,
+            "user_id": 55746,
+            "thermostat_id": 91141,
+            "ecobee_sensor_id": 243243,
+            "identifier": "rs2:100",
+            "name": "Night Stand Left",
+            "type": "ecobee3_remote_sensor",
+            "in_use": true,
+            "temperature": 72.5,
+            "humidity": null,
+            "occupancy": false,
+            "capability": [
+                {
+                    "id": "1",
+                    "type": "temperature",
+                    "value": "725"
+                },
+                {
+                    "id": "2",
+                    "type": "occupancy",
+                    "value": "false"
+                }
+            ],
+            "inactive": false,
+            "deleted": false
+        },
+        "246740": {
+            "sensor_id": 246740,
+            "user_id": 55746,
+            "thermostat_id": 91142,
+            "ecobee_sensor_id": 243244,
+            "identifier": "rs:100",
+            "name": "NetClst High",
+            "type": "ecobee3_remote_sensor",
+            "in_use": false,
+            "temperature": null,
+            "humidity": null,
+            "occupancy": false,
+            "capability": [
+                {
+                    "id": "1",
+                    "type": "temperature",
+                    "value": "unknown"
+                },
+                {
+                    "id": "2",
+                    "type": "occupancy",
+                    "value": "false"
+                }
+            ],
+            "inactive": false,
+            "deleted": false
+        },
+        "246741": {
+            "sensor_id": 246741,
+            "user_id": 55746,
+            "thermostat_id": 91142,
+            "ecobee_sensor_id": 243245,
+            "identifier": "ei:0",
+            "name": "Studio",
+            "type": "thermostat",
+            "in_use": true,
+            "temperature": 73.4,
+            "humidity": 6,
+            "occupancy": false,
+            "capability": [
+                {
+                    "id": "1",
+                    "type": "temperature",
+                    "value": "734"
+                },
+                {
+                    "id": "2",
+                    "type": "humidity",
+                    "value": "58"
+                },
+                {
+                    "id": "3",
+                    "type": "occupancy",
+                    "value": "false"
+                },
+                {
+                    "id": "4",
+                    "type": "airQualityAccuracy",
+                    "value": "unknown"
+                },
+                {
+                    "id": "5",
+                    "type": "airQuality",
+                    "value": "unknown"
+                },
+                {
+                    "id": "6",
+                    "type": "vocPPM",
+                    "value": "unknown"
+                },
+                {
+                    "id": "7",
+                    "type": "co2PPM",
+                    "value": "unknown"
+                },
+                {
+                    "id": "8",
+                    "type": "airPressure",
+                    "value": "unknown"
+                }
+            ],
+            "inactive": false,
+            "deleted": false
+        },
+        "246742": {
+            "sensor_id": 246742,
+            "user_id": 55746,
+            "thermostat_id": 91142,
+            "ecobee_sensor_id": 243246,
+            "identifier": "rs2:100",
+            "name": "Network Closet",
+            "type": "ecobee3_remote_sensor",
+            "in_use": false,
+            "temperature": 82.6,
+            "humidity": null,
+            "occupancy": false,
+            "capability": [
+                {
+                    "id": "1",
+                    "type": "temperature",
+                    "value": "826"
+                },
+                {
+                    "id": "2",
+                    "type": "occupancy",
+                    "value": "false"
+                }
+            ],
+            "inactive": false,
+            "deleted": false
+        }
+    }
+}
