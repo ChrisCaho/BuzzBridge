@@ -80,7 +80,7 @@ def _migrate_device_names(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> 
         if sensor_name.lower() == parent_name.lower():
             base_name = f"{sensor_name} Sensor"
         else:
-            base_name = f"{parent_name} {sensor_name}"
+            base_name = sensor_name
 
         expected_names[f"sensor_{sensor_id}"] = (
             f"{prefix} {base_name}" if prefix else base_name

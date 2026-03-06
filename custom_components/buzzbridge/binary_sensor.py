@@ -93,11 +93,12 @@ async def async_setup_entry(
         parent_tstat = thermostats.get(parent_tstat_id, {})
         parent_name = parent_tstat.get("name", "Unknown")
 
-        # Avoid "Studio Studio" when sensor name matches parent thermostat name
+        # Use sensor name only (parent shown via via_device relationship)
+        # Append "Sensor" if sensor name matches parent thermostat name
         if sensor_name.lower() == parent_name.lower():
             base_name = f"{sensor_name} Sensor"
         else:
-            base_name = f"{parent_name} {sensor_name}"
+            base_name = sensor_name
         remote_device_name = f"{prefix} {base_name}" if prefix else base_name
 
         device_info = DeviceInfo(
