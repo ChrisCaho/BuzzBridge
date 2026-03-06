@@ -1,5 +1,5 @@
 # BuzzBridge - Sensor Platform
-# Rev: 1.4
+# Rev: 1.5
 #
 # Creates sensor entities for each thermostat and remote sensor discovered
 # via the Beestat API. Entity types include:
@@ -53,12 +53,8 @@ from .air_quality import (
 from .api import BeestatApi
 from .calculations import (
     comfort_index,
-    cooling_efficiency,
-    equipment_duty_cycle,
     format_running_equipment,
-    heating_efficiency,
     indoor_outdoor_differential,
-    temperature_swing,
 )
 from .const import (
     DATA_ECOBEE_THERMOSTATS,

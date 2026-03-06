@@ -1,5 +1,5 @@
 # BuzzBridge - Binary Sensor Platform
-# Rev: 1.4
+# Rev: 1.5
 #
 # Binary sensors for:
 #   - Remote sensor occupancy (motion detection via ecobee sensors)
@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,

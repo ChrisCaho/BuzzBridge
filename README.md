@@ -1,9 +1,15 @@
 # BuzzBridge
-# Rev: 1.6.3
+# Rev: 1.7.0
 
 **A Home Assistant custom integration that bridges Beestat data into your smart home.**
 
-BuzzBridge connects to the [Beestat](https://beestat.io/) API to pull advanced ecobee thermostat data that isn't available through the HomeKit or native ecobee integrations — especially since ecobee closed their developer API to new users in March 2024.
+## Why BuzzBridge?
+
+If you use ecobee thermostats with Home Assistant, you've probably set them up through Apple HomeKit or the native ecobee integration. These work well for basic control — adjusting temperature, switching modes, reading the current state — but they operate over local or cloud connections that only expose a limited slice of what your thermostat actually knows. You won't see air quality readings, CO2 and VOC levels, equipment runtime breakdowns, filter status, degree days, or detailed remote sensor data. The ecobee app shows some of this, but there's no way to get it into HA for automations, dashboards, or long-term tracking.
+
+[Beestat](https://beestat.io/) fills that gap. Created by Jon Ziebell, Beestat is a free, open-source analytics platform that connects to ecobee via OAuth and exposes a rich API with all the data ecobee collects — including the advanced metrics the official integrations leave out. This is especially valuable since ecobee closed its developer API to new registrations in March 2024, making Beestat one of the few remaining ways to access this data programmatically. BuzzBridge is the bridge between Beestat and Home Assistant: it polls the Beestat API on a configurable schedule, maps all that data into properly typed HA entities with device classes, translations, and air quality thresholds, and presents it alongside your existing ecobee controls. Your HomeKit or ecobee integration handles control; BuzzBridge handles visibility.
+
+The goal is threefold: give your automations access to richer thermostat data (runtimes, setpoints, equipment status, hold state), add detailed sensor information to your thermostat dashboard cards beyond what HomeKit exposes, and surface air quality monitoring (CO2, VOC, and overall AQ score) from ecobee Premium thermostats — data that would otherwise be locked inside the ecobee app.
 
 ## Features
 
@@ -104,8 +110,9 @@ Each thermostat gets a **Boost Polling** button that switches polling from the c
 1. Go to **Settings → Devices & Services → Add Integration**
 2. Search for **BuzzBridge**
 3. Enter your Beestat API key (40-character hex string)
-4. All thermostats and sensors are discovered automatically
-5. Configure poll intervals in integration options (Settings → Devices & Services → BuzzBridge → Configure)
+4. Optionally set a **device name prefix** (default: "BuzzBridge"). This prefix is added to all device and entity names to distinguish them from your other integrations (e.g., "BuzzBridge Living Room"). Leave blank for no prefix.
+5. All thermostats and sensors are discovered automatically
+6. Configure poll intervals in integration options (Settings → Devices & Services → BuzzBridge → Configure)
 
 ### Poll Intervals
 | Poll Type | Default | Range | Data |

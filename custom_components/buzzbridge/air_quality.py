@@ -1,5 +1,5 @@
 # BuzzBridge - Air Quality Helpers
-# Rev: 1.0
+# Rev: 1.1
 #
 # Functions to interpret air quality data from ecobee Premium thermostats.
 # The ecobee Premium has a Bosch BME680 gas sensor that measures VOCs and
@@ -10,8 +10,6 @@
 # defined in const.py. Each level includes a description and health guidance.
 
 from __future__ import annotations
-
-from typing import Any
 
 from .const import (
     AQ_ACCURACY_LEVELS,

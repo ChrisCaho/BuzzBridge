@@ -1,12 +1,11 @@
 # BuzzBridge - Constants and Configuration
-# Rev: 1.0
+# Rev: 1.1
 #
 # Central definition of all constants, thresholds, entity configurations,
 # and human-readable air quality guidelines used throughout BuzzBridge.
 
 from __future__ import annotations
 
-from datetime import timedelta
 from typing import Final
 
 # =============================================================================
