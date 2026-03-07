@@ -53,7 +53,7 @@ async def async_setup_entry(
     ecobee_thermostats = fast_coord.data.get(DATA_ECOBEE_THERMOSTATS, {})
 
     for tstat_id, tstat in thermostats.items():
-        tstat_name = tstat.get("name", f"Thermostat {tstat_id}")
+        tstat_name = tstat.get("name") or f"Thermostat {tstat_id}"
         ecobee_id = str(tstat.get("ecobee_thermostat_id", ""))
         ecobee_data = ecobee_thermostats.get(ecobee_id, {})
         model_number = ecobee_data.get("model_number", "unknown")

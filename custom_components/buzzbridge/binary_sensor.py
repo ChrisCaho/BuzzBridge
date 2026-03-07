@@ -55,7 +55,7 @@ async def async_setup_entry(
 
     # Thermostat online status
     for tstat_id, tstat in thermostats.items():
-        tstat_name = tstat.get("name", f"Thermostat {tstat_id}")
+        tstat_name = tstat.get("name") or f"Thermostat {tstat_id}"
         ecobee_id = str(tstat.get("ecobee_thermostat_id", ""))
         ecobee_data = ecobee_thermostats.get(ecobee_id, {})
         model_number = ecobee_data.get("model_number", "unknown")
@@ -88,7 +88,7 @@ async def async_setup_entry(
         if not has_occupancy:
             continue
 
-        sensor_name = sensor_data.get("name", f"Sensor {sensor_id}")
+        sensor_name = sensor_data.get("name") or f"Sensor {sensor_id}"
         parent_tstat_id = str(sensor_data.get("thermostat_id", ""))
         parent_tstat = thermostats.get(parent_tstat_id, {})
         parent_name = parent_tstat.get("name", "Unknown")

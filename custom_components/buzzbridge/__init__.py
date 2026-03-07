@@ -48,10 +48,11 @@ def _migrate_naming(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> None:
     Entity IDs follow from device name + entity name:
       sensor.{prefix_slug}_thermostat_{room_slug}_{measurement}
 
-    Handles upgrades from any previous naming scheme by:
-      1. Computing the expected device name from coordinator data
-      2. Renaming entity IDs (old device slug → new device slug)
-      3. Updating the device name in the registry
+    NOTE: HA automatically updates device.name from DeviceInfo during platform
+    setup, which runs BEFORE this function. Therefore we CANNOT rely on
+    device.name differing from expected to detect stale entity IDs. Instead,
+    we compute each entity's expected entity_id directly and compare against
+    the actual entity_id.
 
     Also runs on prefix changes (reconfigure) to update all names.
     """
@@ -68,7 +69,7 @@ def _migrate_naming(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> None:
     expected_names: dict[str, str] = {}
 
     for tstat_id, tstat in thermostats.items():
-        tstat_name = tstat.get("name", f"Thermostat {tstat_id}")
+        tstat_name = tstat.get("name") or f"Thermostat {tstat_id}"
         expected_names[str(tstat_id)] = (
             f"{prefix} Thermostat {tstat_name}" if prefix
             else f"Thermostat {tstat_name}"
@@ -77,7 +78,7 @@ def _migrate_naming(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> None:
     for sensor_id, sensor_data in sensors.items():
         if sensor_data.get("deleted") or sensor_data.get("inactive"):
             continue
-        sensor_name = sensor_data.get("name", f"Sensor {sensor_id}")
+        sensor_name = sensor_data.get("name") or f"Sensor {sensor_id}"
         sensor_type = sensor_data.get("type", "")
         type_prefix = "Base" if sensor_type == "thermostat" else "Remote"
         expected_names[f"sensor_{sensor_id}"] = (
@@ -90,6 +91,9 @@ def _migrate_naming(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> None:
     devices = dr.async_entries_for_config_entry(dev_reg, entry.entry_id)
     all_entities = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
 
+    # Map device_id -> expected device name for entity lookups
+    device_expected_name: dict[str, str] = {}
+
     # Group entities by device_id for efficient lookup
     entities_by_device: dict[str, list] = {}
     for ent in all_entities:
@@ -99,6 +103,7 @@ def _migrate_naming(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> None:
     migrated_devices = 0
     migrated_entities = 0
 
+    # --- Phase 1: Fix device names and name_by_user ---
     for device in devices:
         # Find expected name from device identifiers
         expected = None
@@ -109,9 +114,8 @@ def _migrate_naming(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> None:
         if expected is None:
             continue
 
-        current_name = device.name
-        if current_name == expected and not device.name_by_user:
-            continue  # Already correct, no user override
+        # Record the mapping for phase 2
+        device_expected_name[device.id] = expected
 
         # Clear stale name_by_user so integration-provided name takes effect
         if device.name_by_user:
@@ -121,44 +125,49 @@ def _migrate_naming(hass: HomeAssistant, entry: BuzzBridgeConfigEntry) -> None:
             )
             dev_reg.async_update_device(device.id, name_by_user=None)
 
-        # Rename entity IDs before changing device name
-        old_slug = slugify(current_name)
-        new_slug = slugify(expected)
-
-        if old_slug != new_slug:
-            for ent in entities_by_device.get(device.id, []):
-                old_eid = ent.entity_id
-                domain_part, slug_part = old_eid.split(".", 1)
-
-                if slug_part.startswith(f"{old_slug}_"):
-                    # Entity ID matches current device name — simple slug swap
-                    suffix = slug_part[len(old_slug):]
-                    new_eid = f"{domain_part}.{new_slug}{suffix}"
-                elif ent.original_name:
-                    # Entity ID is from a previous naming era — rebuild from
-                    # the new device slug + the entity's own name
-                    entity_suffix = slugify(ent.original_name)
-                    new_eid = f"{domain_part}.{new_slug}_{entity_suffix}"
-                else:
-                    continue  # Cannot determine suffix, skip
-
-                if new_eid == old_eid:
-                    continue
-                if not valid_entity_id(new_eid) or ent_reg.async_get(new_eid):
-                    _LOGGER.warning(
-                        "Skipping entity migration: %s -> %s (invalid or exists)",
-                        old_eid, new_eid,
-                    )
-                    continue
-                _LOGGER.info("Migrating entity ID: %s -> %s", old_eid, new_eid)
-                ent_reg.async_update_entity(old_eid, new_entity_id=new_eid)
-                migrated_entities += 1
-
         # Update device name if it differs
-        if current_name != expected:
-            _LOGGER.info("Updating device name: %r -> %r", current_name, expected)
+        if device.name != expected:
+            _LOGGER.info("Updating device name: %r -> %r", device.name, expected)
             dev_reg.async_update_device(device.id, name=expected)
             migrated_devices += 1
+
+    # --- Phase 2: Fix entity IDs based on expected device name + original_name ---
+    # This does NOT depend on whether device.name matched — it compares each
+    # entity's actual ID against the computed expected ID directly, so it works
+    # even when HA has already updated device.name during platform setup.
+    for device_id, expected_dev_name in device_expected_name.items():
+        expected_dev_slug = slugify(expected_dev_name)
+
+        for ent in entities_by_device.get(device_id, []):
+            # If there is no original_name we cannot compute the expected ID
+            if ent.original_name is None:
+                continue
+
+            expected_entity_id = (
+                f"{ent.domain}.{expected_dev_slug}_{slugify(ent.original_name)}"
+            )
+            old_eid = ent.entity_id
+
+            if old_eid == expected_entity_id:
+                continue  # Already correct
+
+            if not valid_entity_id(expected_entity_id):
+                _LOGGER.warning(
+                    "Skipping entity migration: %s -> %s (invalid entity ID)",
+                    old_eid, expected_entity_id,
+                )
+                continue
+
+            if ent_reg.async_get(expected_entity_id):
+                _LOGGER.warning(
+                    "Skipping entity migration: %s -> %s (target already exists)",
+                    old_eid, expected_entity_id,
+                )
+                continue
+
+            _LOGGER.info("Migrating entity ID: %s -> %s", old_eid, expected_entity_id)
+            ent_reg.async_update_entity(old_eid, new_entity_id=expected_entity_id)
+            migrated_entities += 1
 
     if migrated_devices or migrated_entities:
         _LOGGER.info(
