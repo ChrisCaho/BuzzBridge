@@ -1,5 +1,5 @@
 # BuzzBridge
-# Rev: 1.7.1
+# Rev: 1.7.4
 
 **A Home Assistant custom integration that bridges Beestat data into your smart home.**
 
@@ -70,9 +70,13 @@ Higher numbers = more energy needed. Useful for:
 - **Indoor/Outdoor Differential** — temperature difference showing insulation effectiveness
 
 ### Remote Sensors
-- **Temperature** — for every ecobee remote sensor
+- **Temperature** — for every ecobee remote sensor and base (thermostat-extracted) sensor
 - **Occupancy** — motion detection as binary sensor
 - **Participating** — whether the sensor is included in the thermostat's comfort average (diagnostic)
+
+Remote sensors are split into two device types:
+- **Remote** — standalone ecobee room sensors (model: Ecobee3 Remote Sensor)
+- **Base** — the thermostat's built-in sensor, extracted as its own device (model: Ecobee3 Base Sensor - Extracted)
 
 ### Filter Status
 - **Filter Runtime** — total hours since last change
@@ -193,11 +197,48 @@ BuzzBridge supports all ecobee thermostat models available through Beestat:
 | `siSmart` | ecobee Si | |
 
 All ecobee remote sensors are also supported:
-- **Room sensors** — temperature and occupancy
-- **Door/window sensors** — temperature and occupancy
-- **Built-in thermostat sensor** — temperature, humidity, and occupancy
+- **Remote sensors** — standalone room sensors (temperature and occupancy)
+- **Base sensors** — the thermostat's built-in sensor, extracted as a separate device (temperature and occupancy)
 
-Remote sensors are automatically discovered and registered as child devices of their parent thermostat.
+Both remote and base sensors are automatically discovered and registered as child devices of their parent thermostat.
+
+---
+
+## Naming Convention
+
+BuzzBridge uses a standardized naming convention for all devices and entities. Names are ordered from most common to least common, left to right.
+
+### Device Names
+
+| Device Type | Name Pattern | Example |
+|-------------|-------------|---------|
+| Thermostat | `{prefix} Thermostat {room}` | BuzzBridge Thermostat Home |
+| Base Sensor | `{prefix} Base {room}` | BuzzBridge Base Home |
+| Remote Sensor | `{prefix} Remote {room}` | BuzzBridge Remote Kitchen |
+
+### Entity IDs
+
+Entity IDs follow the pattern: `{domain}.{prefix}_{type}_{room}_{measurement}`
+
+| Entity | Example Entity ID |
+|--------|-------------------|
+| Thermostat temperature | `sensor.buzzbridge_thermostat_home_temperature` |
+| Thermostat HVAC mode | `sensor.buzzbridge_thermostat_home_hvac_mode` |
+| Thermostat air quality | `sensor.buzzbridge_thermostat_studio_air_quality_score` |
+| Thermostat online | `binary_sensor.buzzbridge_thermostat_home_online` |
+| Remote sensor temp | `sensor.buzzbridge_remote_kitchen_temperature` |
+| Remote occupancy | `binary_sensor.buzzbridge_remote_kitchen_occupancy` |
+| Remote participating | `binary_sensor.buzzbridge_remote_kitchen_participating` |
+| Base sensor temp | `sensor.buzzbridge_base_home_temperature` |
+| Base occupancy | `binary_sensor.buzzbridge_base_home_occupancy` |
+| Boost button | `button.buzzbridge_thermostat_home_boost_polling` |
+
+### Migration
+
+When upgrading from older versions or changing the device prefix, BuzzBridge automatically migrates all device names and entity IDs to match the current naming convention. This runs on every startup and handles:
+- Adding the type prefix (Thermostat, Base, Remote) to device names
+- Renaming entity IDs to match the new device names
+- Clearing any `name_by_user` overrides that conflict with the standard
 
 ---
 
@@ -268,7 +309,7 @@ BuzzBridge supports the Home Assistant diagnostics platform. You can download a 
 - **Data is 3-5 minutes behind real-time** — Beestat applies server-side caching (3 min on sync, 15 min on runtime summaries). This is a Beestat platform constraint, not a BuzzBridge limitation.
 - **API rate limit of ~30 requests/minute** — Each batch request (fast poll or slow poll) counts as 1 request regardless of how many thermostats you have. Under normal operation with defaults, BuzzBridge uses approximately 1 request every 5 minutes plus 1 every 30 minutes.
 - **Air quality sensors require ecobee Premium** — Only the `aresSmart` model has the Bosch BME680 gas sensor. Other models will not expose CO2, VOC, AQ score, or accuracy entities.
-- **Remote sensors provide temperature, occupancy, and participating status only** — Humidity is only available on the thermostat entity itself. Remote sensors cannot be directly controlled.
+- **Remote/base sensors provide temperature, occupancy, and participating status only** — Humidity is only available on the thermostat entity itself. Sensors cannot be directly controlled.
 - **Beestat account required** — A free [Beestat](https://beestat.io/) account linked to your ecobee is required. BuzzBridge does not communicate directly with ecobee.
 - **ecobee developer API closed** — ecobee closed its developer API to new registrations in March 2024. Beestat is grandfathered in. This is why BuzzBridge exists.
 - **Weather sensors are basic** — Weather data comes from ecobee's built-in weather feed, which provides temperature and humidity only. For richer weather data, use a dedicated weather integration.
@@ -284,7 +325,7 @@ automation:
   - alias: "BuzzBridge - Poor Air Quality Alert"
     trigger:
       - platform: numeric_state
-        entity_id: sensor.living_room_air_quality_score
+        entity_id: sensor.buzzbridge_thermostat_studio_air_quality_score
         below: 40
         for:
           minutes: 5
@@ -293,9 +334,9 @@ automation:
         data:
           title: "Poor Air Quality"
           message: >
-            Air quality score dropped to {{ states('sensor.living_room_air_quality_score') }}.
-            CO2: {{ states('sensor.living_room_co2') }} ppm.
-            VOC: {{ states('sensor.living_room_voc') }} ppb.
+            Air quality score dropped to {{ states('sensor.buzzbridge_thermostat_studio_air_quality_score') }}.
+            CO2: {{ states('sensor.buzzbridge_thermostat_studio_co2') }} ppm.
+            VOC: {{ states('sensor.buzzbridge_thermostat_studio_voc') }} ppb.
             Consider opening windows or running ventilation.
 ```
 
@@ -306,12 +347,11 @@ automation:
   - alias: "BuzzBridge - Short Cycling Warning"
     trigger:
       - platform: state
-        entity_id: sensor.living_room_running_equipment
+        entity_id: sensor.buzzbridge_thermostat_home_running_equipment
     condition:
       - condition: template
         value_template: >
-          {% set changes = states.sensor.living_room_running_equipment.last_changed %}
-          {% set history = state_attr('sensor.living_room_running_equipment', 'history') %}
+          {% set changes = states.sensor.buzzbridge_thermostat_home_running_equipment.last_changed %}
           {{ (now() - changes).total_seconds() < 600 }}
     action:
       - service: notify.notify
@@ -319,7 +359,7 @@ automation:
           title: "HVAC Short Cycling Detected"
           message: >
             Your thermostat equipment is cycling frequently.
-            Current status: {{ states('sensor.living_room_running_equipment') }}.
+            Current status: {{ states('sensor.buzzbridge_thermostat_home_running_equipment') }}.
             This may indicate an oversized system, dirty filter, or refrigerant issue.
 ```
 
@@ -330,7 +370,7 @@ automation:
   - alias: "BuzzBridge - High CO2 Ventilation"
     trigger:
       - platform: numeric_state
-        entity_id: sensor.living_room_co2
+        entity_id: sensor.buzzbridge_thermostat_studio_co2
         above: 1000
         for:
           minutes: 5
@@ -342,7 +382,7 @@ automation:
         data:
           title: "High CO2 - Ventilating"
           message: >
-            CO2 is {{ states('sensor.living_room_co2') }} ppm (EPA max: 1000 ppm).
+            CO2 is {{ states('sensor.buzzbridge_thermostat_studio_co2') }} ppm (EPA max: 1000 ppm).
             Turning on ventilation fan.
 ```
 
@@ -353,7 +393,7 @@ automation:
   - alias: "BuzzBridge - Thermostat Offline Alert"
     trigger:
       - platform: state
-        entity_id: binary_sensor.living_room_online
+        entity_id: binary_sensor.buzzbridge_thermostat_home_online
         to: "off"
         for:
           minutes: 10
@@ -383,6 +423,18 @@ Then restart Home Assistant. Debug logs will appear in **Settings > System > Log
 ### Download Diagnostics
 Go to **Settings > Devices & Services > BuzzBridge > 3 dots menu > Download Diagnostics**. The diagnostics file includes coordinator data with sensitive fields (API key, tokens, location, serial numbers) automatically redacted. This is the most useful artifact when reporting issues.
 
+### Developer Tools
+
+The `tools/` directory contains diagnostic scripts for troubleshooting installations:
+- **`beestat_dump.sh`** — Dumps all Beestat API data to a JSON file for analysis
+- **`ha_diagnostic.sh`** — Collects HA entity states, device/entity registries, and logs
+- **`entity_audit.py`** — Validates naming conventions against the entity registry
+- **`beestat_live.sh`** — Real-time API monitor with configurable interval
+- **`validate_install.sh`** — Pre-install checker for file structure and syntax
+- **`list_entities.py`** — Lists all BuzzBridge entity IDs from the HA registry
+
+See `tools/README.md` for usage details.
+
 ### Common Issues
 
 - **"Invalid API key"** — Ensure the key is exactly 40 hex characters. Find it at app.beestat.io → Menu → API Key.
@@ -401,5 +453,8 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ## Credits
 
-- [Beestat](https://beestat.io/) by Jon Ziebell — the API that makes this possible
-- Built with [Claude Code](https://claude.ai/claude-code)
+- **Author:** Chris Caho — project concept, architecture direction, and testing
+- **Developer:** [Claude Code](https://claude.ai/claude-code) by Anthropic — code generation, implementation, and documentation
+- **Data source:** [Beestat](https://beestat.io/) by Jon Ziebell — the API that makes this possible
+
+This project was built using AI-assisted development. All code was generated by Claude Code (Anthropic) under the direction and review of Chris Caho. This is an original work, not a fork or derivative of any existing integration.
