@@ -1,5 +1,5 @@
 # BuzzBridge - Button Platform
-# Rev: 1.6
+# Rev: 1.7
 #
 # Provides button entities per thermostat:
 #   - "Boost Polling": switches fast polling to every 60 seconds for 60 minutes,
@@ -125,7 +125,7 @@ class BuzzBridgeRefreshButton(CoordinatorEntity, ButtonEntity):
     """
 
     _attr_has_entity_name = True
-    _attr_translation_key = "refresh_now"
+    _attr_name = "Refresh Now"
     _attr_icon = "mdi:refresh"
 
     def __init__(
