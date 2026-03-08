@@ -89,6 +89,9 @@ Remote sensors are split into two device types:
 ### Boost Polling
 Each thermostat gets a **Boost Polling** button that switches polling from the configured interval (default 5 min) to every 60 seconds for 60 minutes, then automatically reverts. Useful for monitoring changes in real-time or debugging.
 
+### Refresh Now
+Each thermostat gets a **Refresh Now** button that triggers an immediate one-time refresh of all data (both fast and slow poll) without changing polling intervals. Useful for getting fresh data on demand after making changes.
+
 ## Prerequisites
 
 1. An [ecobee](https://www.ecobee.com/) thermostat
@@ -290,6 +293,7 @@ When upgrading from older versions or changing the device prefix, BuzzBridge aut
 ### Button Entities
 
 - **Boost Polling** (per thermostat) — activates 1-minute polling for 60 minutes
+- **Refresh Now** (per thermostat) — immediate one-time refresh of all data
 
 ### Source Attribute
 

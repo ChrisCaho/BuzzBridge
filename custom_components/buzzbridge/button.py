@@ -1,10 +1,11 @@
 # BuzzBridge - Button Platform
-# Rev: 1.5
+# Rev: 1.6
 #
-# Provides a "Boost Polling" button entity per thermostat.
-# When pressed, switches fast polling to every 60 seconds for 60 minutes,
-# then automatically reverts to the configured interval.
-# Useful for debugging and monitoring real-time changes.
+# Provides button entities per thermostat:
+#   - "Boost Polling": switches fast polling to every 60 seconds for 60 minutes,
+#     then automatically reverts to the configured interval.
+#   - "Refresh Now": triggers an immediate one-time refresh of all data
+#     (both fast and slow poll) without changing polling intervals.
 
 from __future__ import annotations
 
@@ -26,7 +27,7 @@ from .const import (
     ECOBEE_MODELS,
     MANUFACTURER,
 )
-from .coordinator import FastPollCoordinator
+from .coordinator import FastPollCoordinator, SlowPollCoordinator
 from .entity import BuzzBridgeConfigEntry, get_device_prefix
 
 _LOGGER = logging.getLogger(__name__)
@@ -44,6 +45,7 @@ async def async_setup_entry(
     prefix = get_device_prefix(entry)
 
     entities: list[ButtonEntity] = []
+    slow_coord = entry.runtime_data.slow_coordinator
 
     if fast_coord.data is None:
         _LOGGER.error("BuzzBridge: coordinator data is None during button setup")
@@ -68,6 +70,9 @@ async def async_setup_entry(
 
         entities.append(
             BuzzBridgeBoostButton(fast_coord, tstat_id, device_info, tstat_name)
+        )
+        entities.append(
+            BuzzBridgeRefreshButton(fast_coord, slow_coord, tstat_id, device_info, tstat_name)
         )
 
     async_add_entities(entities)
@@ -110,3 +115,35 @@ class BuzzBridgeBoostButton(CoordinatorEntity, ButtonEntity):
             "boost_interval_seconds": BOOST_POLL_SECONDS,
             "boost_duration_minutes": BOOST_DURATION_MINUTES,
         }
+
+
+class BuzzBridgeRefreshButton(CoordinatorEntity, ButtonEntity):
+    """Button to trigger an immediate one-time refresh of all data.
+
+    Refreshes both fast poll (thermostat state, sensors, air quality) and
+    slow poll (runtime summaries, settings) without changing polling intervals.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "refresh_now"
+    _attr_icon = "mdi:refresh"
+
+    def __init__(
+        self,
+        fast_coordinator: FastPollCoordinator,
+        slow_coordinator: SlowPollCoordinator,
+        tstat_id: str,
+        device_info: DeviceInfo,
+        tstat_name: str,
+    ) -> None:
+        super().__init__(fast_coordinator)
+        self._slow_coordinator = slow_coordinator
+        self._tstat_id = str(tstat_id)
+        self._attr_unique_id = f"{DOMAIN}_{tstat_id}_refresh_now"
+        self._attr_device_info = device_info
+
+    async def async_press(self) -> None:
+        """Trigger immediate refresh of all data."""
+        _LOGGER.info("Refresh Now pressed — fetching all data")
+        await self.coordinator.async_request_refresh()
+        await self._slow_coordinator.async_request_refresh()

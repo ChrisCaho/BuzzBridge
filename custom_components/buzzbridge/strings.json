@@ -115,7 +115,8 @@
       "participating": { "name": "Participating" }
     },
     "button": {
-      "boost_polling": { "name": "Boost Polling" }
+      "boost_polling": { "name": "Boost Polling" },
+      "refresh_now": { "name": "Refresh Now" }
     }
   }
 }
