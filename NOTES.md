@@ -1,5 +1,5 @@
 # BuzzBridge - Development Notes
-# Rev: 4.0
+# Rev: 5.0
 
 ## Project Overview
 Custom Home Assistant integration that pulls ecobee thermostat data from the Beestat API
@@ -41,22 +41,30 @@ and exposes it as HA sensors. Bridges the gap left by ecobee closing their devel
 ## File Structure
 ```
 custom_components/buzzbridge/
-  __init__.py      - Integration setup, runtime_data, options listener, device cleanup
+  __init__.py      - Integration setup, naming migration, options listener, device cleanup
   api.py           - BeestatApi async HTTP client with batch support
   config_flow.py   - Config flow + reauth + reconfigure + options flow
   coordinator.py   - FastPollCoordinator + SlowPollCoordinator + boost mode
   entity.py        - BuzzBridgeEntity base class, BuzzBridgeData dataclass, type alias
-  sensor.py        - All sensor entities (thermostat, AQ, runtime, remote)
-  binary_sensor.py - Occupancy + online status
+  sensor.py        - All sensor entities (thermostat, AQ, runtime, remote, base)
+  binary_sensor.py - Online + occupancy + participating
   button.py        - Boost polling button
   air_quality.py   - AQ threshold lookups (CO2, VOC, score, accuracy)
   calculations.py  - Calculated sensor functions (efficiency, comfort, etc.)
-  const.py         - All constants, thresholds, equipment maps
+  const.py         - All constants, thresholds, equipment maps, model names
   diagnostics.py   - Diagnostic data export with sensitive field redaction
   manifest.json    - HA integration manifest
   strings.json     - All UI strings, entity translations, issue strings, exception strings
   icons.json       - Entity icon definitions (translation-based)
   translations/en.json - English translations (copy of strings.json)
+tools/
+  beestat_dump.sh      - API data dump for developer analysis
+  ha_diagnostic.sh     - HA state/registry collector
+  entity_audit.py      - Naming convention validator
+  beestat_live.sh      - Real-time API monitor
+  validate_install.sh  - Pre-install checker
+  list_entities.py     - Entity ID lister
+  README.md            - Tool documentation
 tests/
   conftest.py      - Shared fixtures, mock data
   test_config_flow.py - Config flow test coverage
@@ -129,3 +137,17 @@ tests/
   - Exception translation strings
   - Comprehensive test suite
   - Gold-tier documentation (data update, supported devices/functions, examples, troubleshooting)
+- 2026-03-06: v1.7.1 — Data fixes (differential x10 encoding, removed remote sensor humidity, participating binary sensor, source attribute)
+- 2026-03-06: v1.7.3 — Standardized naming convention:
+  - Four device types: Thermostat, Base, Remote (+ Premium variant)
+  - Device names: {prefix} {type} {room}
+  - Entity IDs: {domain}.{prefix}_{type}_{room}_{measurement}
+  - Two-phase migration in __init__.py
+  - SENSOR_TYPE_MODELS const for base sensor model name
+- 2026-03-06: v1.7.4 — Bug fixes from code review:
+  - Fixed None/empty name handling (.get("name") or fallback)
+  - Fixed EntityCategory import in binary_sensor.py
+  - Moved datetime import to top-level in sensor.py
+  - Eliminated duplicate dict lookups in filter sensor
+  - Fixed name_by_user clearing on every restart
+  - Created tools/ diagnostic directory

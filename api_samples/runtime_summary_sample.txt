@@ -1,8 +1,8 @@
 Record 93645519:
 {
   "runtime_thermostat_summary_id": 93645519,
-  "user_id": 55746,
-  "thermostat_id": 91140,
+  "user_id": 12345,
+  "thermostat_id": 99001,
   "date": "2025-10-17",
   "count": 175,
   "sum_compressor_cool_1": 20610,
@@ -30,8 +30,8 @@ Record 93645519:
 Record 93645520:
 {
   "runtime_thermostat_summary_id": 93645520,
-  "user_id": 55746,
-  "thermostat_id": 91140,
+  "user_id": 12345,
+  "thermostat_id": 99001,
   "date": "2025-10-18",
   "count": 288,
   "sum_compressor_cool_1": 14535,
@@ -59,8 +59,8 @@ Record 93645520:
 Record 93645521:
 {
   "runtime_thermostat_summary_id": 93645521,
-  "user_id": 55746,
-  "thermostat_id": 91140,
+  "user_id": 12345,
+  "thermostat_id": 99001,
   "date": "2025-10-19",
   "count": 288,
   "sum_compressor_cool_1": 5430,
