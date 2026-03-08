@@ -1,5 +1,5 @@
 # BuzzBridge
-# Rev: 1.7.4
+# Rev: 1.7.5
 
 **A Home Assistant custom integration that bridges Beestat data into your smart home.**
 
